@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node outputs/vault-server.js",
     "sync": "node outputs/vault-sync.js",
-    "test": "node --test tests/*.test.js",
+    "test": "node --test tests/catalog-model.test.js tests/dashboard.test.js tests/scan-plan.test.js tests/scanner.test.js tests/server.test.js tests/sync.test.js tests/vault-platform.test.js tests/web-search.test.js",
     "check": "node --check outputs/catalog-model.js && node --check outputs/vault-platform.js && node --check outputs/scan-plan.js && node --check outputs/web-search.js && node --check outputs/availability-scanner.js && node --check outputs/vault-sync.js && node --check outputs/vault-server.js && node --check outputs/vault-agent.js && node --check outputs/vault-toggle.js",
     "verify": "npm run check && npm test"
   },
