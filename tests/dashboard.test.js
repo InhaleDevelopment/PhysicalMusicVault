@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const html = fs.readFileSync(path.resolve(__dirname, "../outputs/physical-music-vault.html"), "utf8");
+const css = fs.readFileSync(path.resolve(__dirname, "../outputs/vault.css"), "utf8");
 
 test("dashboard exposes the required catalogue controls", () => {
   for (const text of ["Wanted", "Owned", "Not Interested", "Priority", "Budget Currency"]) {
@@ -28,4 +29,20 @@ test("empty album editor can be closed without required-field validation", () =>
     html,
     /value="cancel"[^>]*formnovalidate[^>]*aria-label="Close editor"/
   );
+});
+
+test("library controls and copy are provider-neutral", () => {
+  assert.match(html, /Synced source folder/);
+  assert.match(html, /Import catalogue file/);
+  for (const legacyName of ["Apple" + " Music", "Metal" + "lum", "metal-" + "archives"]) {
+    assert.equal(html.toLowerCase().includes(legacyName.toLowerCase()), false);
+  }
+});
+
+test("album artwork uses stable square containers without distortion", () => {
+  assert.match(css, /--cover-size:\s*88px/);
+  assert.match(css, /height:\s*var\(--cover-size/);
+  assert.match(css, /aspect-ratio:\s*1/);
+  assert.match(css, /object-fit:\s*cover/);
+  assert.match(css, /object-position:\s*center/);
 });

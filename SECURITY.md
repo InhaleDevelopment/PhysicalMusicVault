@@ -13,7 +13,8 @@ Please report a suspected vulnerability privately through GitHub's security advi
 - The server listens on localhost unless private-network access is explicitly enabled.
 - Mutation endpoints enforce same-origin browser requests.
 - Only the dashboard and its stylesheet are public static files. Runtime JSON, settings, logs, source code, and scan state are not web-accessible.
-- Public API responses remove music roots, source paths, and artwork paths.
+- Public API responses remove library roots, source paths, and artwork paths.
+- The synced source folder can only be changed by a request from the host PC.
 - Artwork requests resolve an album ID and verify the real image remains inside that album's source folder.
 - Settings and album updates use field allowlists and bounded values.
 - JSON state is written atomically.

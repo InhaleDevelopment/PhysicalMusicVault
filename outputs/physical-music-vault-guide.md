@@ -26,7 +26,7 @@ Each album begins with:
 artist - album buy
 ```
 
-Discogs and Encyclopedia Metallum are searched for identity evidence. A direct seller page is accepted only when it proves the release, selected physical format, numeric price, purchase control, and current stock state.
+Discogs is searched for artist and release identity evidence across every genre. A direct seller page is accepted only when it proves the release, selected physical format, numeric price, purchase control, and current stock state.
 
 ## Dashboard
 

@@ -6,11 +6,11 @@ Version 3 is a dependency-light Node.js application with no account, cloud datab
 
 ## Product Flow
 
-1. Watch `Music/Apple Music/Media/Music/<Artist>/<Album>` for changes and reconcile the folder every 10 minutes.
+1. Watch any configured `<Artist>/<Album>` music folder for changes and reconcile it every 10 minutes, or import a CSV/JSON catalogue.
 2. Keep catalogue status separate from a 1-5 purchase priority and a per-album price range.
 3. Select up to 500 Wanted albums per local calendar day, highest priority first.
 4. Search the exact query `Artist - Album buy` using a free, keyless provider or an optional self-hosted SearXNG instance.
-5. Cross-check the release against Discogs and Encyclopedia Metallum.
+5. Cross-check the artist and release against Discogs across every genre.
 6. Accept a result only when the direct seller page proves the artist, album, physical format, numeric price, and an active purchase control.
 7. Show new finds, the Top 100 priority-ranked available albums, and all current priority 5 matches.
 
@@ -23,10 +23,19 @@ Prices are converted among AUD, USD, GBP, and EUR using daily reference rates fr
 1. Install Node.js 20 or newer, including npm.
 2. Double-click `outputs/Vault On-Off.cmd`.
 3. The first start installs the open-source parser dependency and opens `http://localhost:8787/`.
-4. Mark albums Wanted, Owned, or Not Interested and set priority, format, and price range.
-5. Select **Today's 500**, then use **Scan Next 25** or leave 30-minute automation enabled.
+4. In Settings, point **Synced source folder** to the folder containing `<Artist>/<Album>` directories, or import a CSV/JSON catalogue.
+5. Mark albums Wanted, Owned, or Not Interested and set priority, format, and price range.
+6. Select **Today's 500**, then use **Scan Next 25** or leave 30-minute automation enabled.
 
 Double-click `Vault On-Off.cmd` again to stop the dashboard. The built-in provider needs no API key, account, card, or paid plan.
+
+## Library Sources
+
+- **Folder sync:** use any local or externally mounted folder organised as `<Artist>/<Album>`. Change it from Settings on the host PC or set the `MUSIC_ROOT` environment variable.
+- **Catalogue import:** load CSV or JSON exported by a digital music service. Album and Artist are required; Album Artist, Genre, Year, Date Added, Format, and Artwork URL are optional.
+- **Manual entry:** add an album directly when it is not represented in a folder or export.
+
+The source path stays in the private local settings file and is never returned by the browser API or committed to Git.
 
 ## Search Providers
 
@@ -44,7 +53,7 @@ Turn on **iPhone and iPad access** in Settings, turn the vault off and on once, 
 ## Privacy
 
 - Library data, preferences, scan history, and trusted vendors stay in ignored files under `outputs/`.
-- Search requests contain artist, album, format, and public search terms only. Local paths and Apple account information are never sent.
+- Search requests contain artist, album, format, and public search terms only. Local paths and music-service account details are never sent.
 - The browser reports its IANA timezone to the local server so daily queues and timestamps match the user's device.
 - The app does not change Windows proxy, DNS, hosts, or firewall settings. It makes ordinary outbound HTTPS requests from Node.js.
 - The server binds to localhost by default; private-network listening is opt-in.
@@ -55,7 +64,7 @@ No username, library path, API key, or personal catalogue is included in the rep
 
 A listing is accepted only when:
 
-1. Discogs or Encyclopedia Metallum confirms the artist and release after both sources are searched.
+1. Discogs confirms the artist and release.
 2. The seller page itself matches the artist and album.
 3. The selected physical format is present.
 4. A numeric price is present.

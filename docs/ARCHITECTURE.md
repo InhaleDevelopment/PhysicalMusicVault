@@ -29,7 +29,7 @@ Physical Music Vault is intentionally local-first and dependency-light. A Node.j
 
 A search result becomes a listing only when all of these checks pass:
 
-1. Discogs or Encyclopedia Metallum independently matches artist and release.
+1. Discogs independently matches the artist and release.
 2. The final URL is a direct vendor or marketplace page, not a search, wiki, review, video, or digital-only store.
 3. Product-page evidence matches the artist and album.
 4. Product-page evidence names the selected physical format.
@@ -40,7 +40,7 @@ The policy favours precision over recall: uncertain pages are rejected.
 
 ## Persistence
 
-Runtime files live beside the app by default and are ignored by Git. Set `VAULT_DATA_DIR` to keep runtime data elsewhere and `MUSIC_ROOT` to use another library folder. JSON state is written through temporary files and atomic renames.
+Runtime files live beside the app by default and are ignored by Git. Set `VAULT_DATA_DIR` to keep runtime data elsewhere and `MUSIC_ROOT` to select a library folder without using the local Settings control. JSON state is written through temporary files and atomic renames.
 
 ## Network Boundary
 

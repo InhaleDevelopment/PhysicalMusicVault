@@ -14,9 +14,10 @@ node_modules/
 /outputs/availability-scan-results.json
 /outputs/trusted-vendors.json
 /outputs/agent-status.json
-/outputs/apple-music-folder-import.csv
+/outputs/*folder-import.csv
 /outputs/vault-stop.request
 /outputs/availability-scanner.lock
+/outputs/*.tmp
 
 # Runtime logs
 /outputs/*.log

@@ -1,8 +1,8 @@
 {
   "name": "physical-music-vault",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "private": true,
-  "description": "A local Apple Music library and physical release availability dashboard.",
+  "description": "A local digital music library and physical release availability dashboard.",
   "main": "outputs/vault-server.js",
   "scripts": {
     "start": "node outputs/vault-server.js",

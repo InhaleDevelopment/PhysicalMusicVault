@@ -10,6 +10,7 @@
   "searxngUrl": "",
   "searchResultLimit": 20,
   "maxListingsPerAlbum": 12,
+  "libraryRoot": "",
   "currency": "USD",
   "exchangeRatesToAud": {
     "AUD": 1,

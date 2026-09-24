@@ -34,16 +34,16 @@ test("parses seller currency and creates all display conversions", () => {
   assert.equal(price.convertedPrices.USD, 10.67);
 });
 
-test("identity validation accepts a matching Discogs or Metallum record after both searches", () => {
+test("identity validation requires a matching Discogs record", () => {
   const album = { artist: "Acherontas", album: "Tat Tvam Asi" };
-  const valid = identityVerification(album,
-    { results: [{ title: "Acherontas - Tat Tvam Asi", url: "https://www.discogs.com/release/1", snippet: "" }] },
-    { results: [{ title: "Acherontas - Tat Tvam Asi", url: "https://www.metal-archives.com/albums/x/y/1", snippet: "" }] }
-  );
+  const valid = identityVerification(album, {
+    results: [{ title: "Acherontas - Tat Tvam Asi", url: "https://www.discogs.com/release/1", snippet: "" }]
+  });
   assert.equal(valid.ok, true);
-  assert.equal(valid.sources.length, 2);
+  assert.equal(valid.source, "Discogs");
+  assert.equal(valid.sources.length, 1);
 
-  const missing = identityVerification(album, { results: [] }, { results: [] });
+  const missing = identityVerification(album, { results: [] });
   assert.equal(missing.ok, false);
 });
 

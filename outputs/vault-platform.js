@@ -38,7 +38,7 @@ function stripLocalPathFields(value) {
   if (!value || typeof value !== "object") return value;
   const output = Array.isArray(value) ? [] : {};
   for (const [key, nested] of Object.entries(value)) {
-    if (["musicRoot", "sourcePath", "sourcePaths", "artworkPath"].includes(key)) continue;
+    if (["musicRoot", "libraryRoot", "sourcePath", "sourcePaths", "artworkPath"].includes(key)) continue;
     output[key] = stripLocalPathFields(nested);
   }
   return output;

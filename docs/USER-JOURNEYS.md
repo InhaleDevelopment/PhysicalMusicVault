@@ -7,11 +7,11 @@ These are the release acceptance journeys for Physical Music Vault.
 1. The user double-clicks `outputs/Vault On-Off.cmd`.
 2. Missing npm dependencies install on the first run only.
 3. The local service starts and the dashboard opens.
-4. A found music folder syncs immediately; a missing folder produces a clear System status without deleting browser data.
+4. The default Music folder syncs immediately. The user can point Settings to any `<Artist>/<Album>` folder or import a CSV/JSON catalogue.
 
 ## Build The Watchlist
 
-1. The Collection view shows the synced library with local cover artwork when available.
+1. The Collection view combines the configured folder, imported catalogues, and manual entries, with local cover artwork when available.
 2. Search and format/status filters narrow large libraries without rendering the whole catalogue at once.
 3. Wanted enters search selection; Owned and Not Interested stay out.
 4. Priority 1-5 controls queue order. Priority 5 is the highest.

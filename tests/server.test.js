@@ -37,7 +37,7 @@ test("local server protects private data and supports the core album journey", a
       status: "wanted",
       priority: 3,
       format: "cd",
-      source: "apple-music-folder",
+      source: "music-folder",
       sourcePath: albumRoot,
       sourcePaths: [albumRoot],
       artworkPath
@@ -88,4 +88,22 @@ test("local server protects private data and supports the core album journey", a
   assert.equal(response.status, 200);
   assert.equal((await fetch(`${base}/api/albums/manual-release`, { method: "DELETE" })).status, 200);
   assert.equal((await fetch(`${base}/api/albums/artist-album`, { method: "DELETE" })).status, 409);
+
+  response = await fetch(`${base}/api/library-source`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: "relative-folder" })
+  });
+  assert.equal(response.status, 400);
+
+  response = await fetch(`${base}/api/library-source`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: path.join(dataRoot, "music") })
+  });
+  const sourceResult = await response.json();
+  assert.equal(response.status, 202);
+  assert.equal(sourceResult.settings.libraryFolderName, "music");
+  assert.equal(sourceResult.settings.libraryFolderAvailable, true);
+  assert.equal(JSON.stringify(sourceResult).includes(dataRoot), false);
 });

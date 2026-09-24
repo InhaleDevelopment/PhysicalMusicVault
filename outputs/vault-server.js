@@ -34,7 +34,7 @@ const scanPlanPath = path.join(dataRoot, "daily-scan-plan.json");
 const trustedVendorsPath = path.join(dataRoot, "trusted-vendors.json");
 const agentStatusPath = path.join(dataRoot, "agent-status.json");
 const syncResultPath = path.join(dataRoot, "vault-sync-results.json");
-const musicRoot = process.env.MUSIC_ROOT || path.join(os.homedir(), "Music", "Apple Music", "Media", "Music");
+const defaultMusicRoot = path.join(os.homedir(), "Music");
 const defaultSettings = {
   automationEnabled: true,
   webAccessEnabled: true,
@@ -47,11 +47,13 @@ const defaultSettings = {
   searxngUrl: "",
   searchResultLimit: 20,
   maxListingsPerAlbum: 12,
+  libraryRoot: "",
   timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
   currency: "USD",
   exchangeRatesToAud: { AUD: 1, USD: 1.52, EUR: 1.65, GBP: 1.95 }
 };
 let settings = loadSettings();
+let musicRoot = path.resolve(process.env.MUSIC_ROOT || settings.libraryRoot || defaultMusicRoot);
 const bindHost = settings.allowLanAccess === true ? "0.0.0.0" : "127.0.0.1";
 function isOutboundWebDisabled() {
   return /^(1|true|yes)$/i.test(String(process.env.VAULT_DISABLE_WEB || "")) || loadSettings().webAccessEnabled === false;
@@ -130,6 +132,11 @@ function isSameOriginMutation(req) {
   }
 }
 
+function isLocalRequest(req) {
+  const remoteAddress = String(req.socket.remoteAddress || "");
+  return remoteAddress === "127.0.0.1" || remoteAddress === "::1" || remoteAddress === "::ffff:127.0.0.1";
+}
+
 function publicRuntimeMessage(value) {
   let message = String(value || "");
   for (const [privatePath, label] of [[musicRoot, "your music library"], [root, "local application data"], [os.homedir(), "your user folder"]]) {
@@ -191,7 +198,36 @@ async function refreshExchangeRates() {
 }
 
 function publicSettings() {
-  return loadSettings();
+  const current = loadSettings();
+  const { libraryRoot, ...safe } = current;
+  return {
+    ...safe,
+    libraryFolderName: path.basename(musicRoot) || "Music",
+    libraryFolderAvailable: fs.existsSync(musicRoot),
+    libraryFolderLocked: Boolean(process.env.MUSIC_ROOT)
+  };
+}
+
+function setLibraryRoot(value) {
+  if (process.env.MUSIC_ROOT) {
+    throw new Error("The source folder is controlled by the MUSIC_ROOT environment variable.");
+  }
+  const requested = String(value || "").trim();
+  if (!requested || !path.isAbsolute(requested)) {
+    throw new Error("Enter a complete local folder path.");
+  }
+  const resolved = path.resolve(requested);
+  if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
+    throw new Error("That source folder does not exist or is not a directory.");
+  }
+  settings = { ...loadSettings(), libraryRoot: resolved };
+  atomicWriteJson(settingsPath, settings);
+  musicRoot = resolved;
+  if (libraryWatcher) libraryWatcher.close();
+  libraryWatcher = null;
+  libraryWatcherStatus = { active: false, message: "Connecting the selected music folder." };
+  startLibraryWatcher();
+  return publicSettings();
 }
 
 function localNetworkUrls() {
@@ -339,8 +375,7 @@ async function runNetworkTest() {
   const checks = {
     internet: await testUrl("https://www.google.com/generate_204"),
     search: await testSearchProvider(),
-    discogs: await testUrl("https://www.discogs.com/search/?type=all&q=Acherontas%20-%20Ta%20Tvam%20Asi"),
-    metallum: await testUrl("https://www.metal-archives.com/search/ajax-band-search/?field=name&query=Acherontas")
+    discogs: await testUrl("https://www.discogs.com/search/?type=all&q=Acherontas%20-%20Ta%20Tvam%20Asi")
   };
   networkTestRunning = false;
   const discogsFallbackAvailable = checks.discogs.ok || checks.discogs.status === 403;
@@ -430,7 +465,6 @@ function mergeAvailability(vault, updates) {
       identitySource: bestListing.identitySource || update.identitySource || old.identitySource,
       identityUrl: bestListing.identityUrl || update.identityUrl || old.identityUrl,
       identitySources: bestListing.identitySources || update.identitySources || old.identitySources || [],
-      metallumVerificationUrl: bestListing.metallumUrl || update.metallumVerificationUrl || old.metallumVerificationUrl || "",
       lastChecked: update.lastChecked || new Date().toISOString(),
       notes: update.notes || old.notes,
       searchOrder: update.searchOrder || old.searchOrder,
@@ -456,18 +490,48 @@ function mergeAvailability(vault, updates) {
   return vault;
 }
 
+function canonicalDiscogsListing(listing = {}, album = {}) {
+  const sourceRows = Array.isArray(listing.identitySources) ? listing.identitySources : [];
+  const discogsSource = sourceRows.find(source => /discogs/i.test(String(source?.source || "")) && /discogs\.com/i.test(String(source?.url || "")));
+  const identityUrl = [listing.identityUrl, listing.discogsVerificationUrl, album.discogsVerificationUrl, discogsSource?.url]
+    .find(url => /discogs\.com/i.test(String(url || ""))) || "";
+  if (!identityUrl) return null;
+  const allowedUrlFields = new Set(["url", "directUrl", "purchaseUrl", "identityUrl"]);
+  const cleaned = Object.fromEntries(Object.entries(listing)
+    .filter(([key]) => !key.toLowerCase().endsWith("url") || allowedUrlFields.has(key)));
+  return {
+    ...cleaned,
+    identityVerified: true,
+    identitySource: "Discogs",
+    identityUrl,
+    identitySources: [{ source: "Discogs", url: identityUrl, verified: true, checked: true }]
+  };
+}
+
 function readVault() {
   if (!fs.existsSync(vaultPath)) return { schemaVersion: 2, albums: [], matchEvents: [] };
   try {
     const vault = JSON.parse(readJsonText(vaultPath));
     vault.schemaVersion = 2;
     vault.albums = Array.isArray(vault.albums) ? vault.albums.map(album => {
-      const normalised = normaliseAlbum(album);
-      const listings = (normalised.listings || []).filter(listing => !isKnownDigitalOnlyUrl(listing.url || listing.directUrl || listing.purchaseUrl));
-      if (listings.length === (normalised.listings || []).length && !isKnownDigitalOnlyUrl(normalised.directUrl || normalised.resultUrl || normalised.listingUrl || normalised.purchaseUrl)) {
-        return normalised;
-      }
+      const cleanedAlbum = Object.fromEntries(Object.entries(album)
+        .filter(([key]) => !key.toLowerCase().endsWith("verificationurl") || key === "discogsVerificationUrl"));
+      const normalised = normaliseAlbum({
+        ...cleanedAlbum,
+        discogsVerificationUrl: /discogs\.com/i.test(String(cleanedAlbum.discogsVerificationUrl || ""))
+          ? cleanedAlbum.discogsVerificationUrl
+          : "",
+        source: cleanedAlbum.sourcePath || (cleanedAlbum.sourcePaths || []).length ? "music-folder" : cleanedAlbum.source
+      });
+      const listings = (normalised.listings || [])
+        .filter(listing => !isKnownDigitalOnlyUrl(listing.url || listing.directUrl || listing.purchaseUrl))
+        .map(listing => canonicalDiscogsListing(listing, normalised))
+        .filter(Boolean);
       const best = listings[0] || {};
+      const canonicalSearchOrder = ["Exact web query", "Discogs identity check", "Direct seller-page verification"];
+      const legacySearchShape = Array.isArray(normalised.searchOrder)
+        && normalised.searchOrder.some(step => !canonicalSearchOrder.includes(step));
+      const legacyIdentityNote = /confirmed by Discogs or /i.test(String(normalised.notes || ""));
       return normaliseAlbum({
         ...normalised,
         listings,
@@ -475,6 +539,13 @@ function readVault() {
         verifiedPurchase: listings.length > 0,
         purchaseActionFound: listings.length > 0,
         identityVerified: listings.length > 0,
+        identitySource: listings.length ? "Discogs" : "",
+        identityUrl: best.identityUrl || "",
+        identitySources: best.identitySources || [],
+        searchOrder: normalised.searchOrder?.length ? canonicalSearchOrder : [],
+        notes: legacySearchShape || legacyIdentityNote
+          ? listings.length ? "" : "The previous identity check did not confirm this release. It will be rechecked with Discogs."
+          : normalised.notes,
         purchaseUrl: best.url || "",
         directUrl: best.url || "",
         resultUrl: best.url || "",
@@ -484,8 +555,16 @@ function readVault() {
         audDisplay: best.audDisplay || ""
       });
     }) : [];
+    vault.source = "Local music folder and imported catalogue files";
     if (!Array.isArray(vault.matchEvents)) vault.matchEvents = [];
-    vault.matchEvents = vault.matchEvents.filter(event => !isKnownDigitalOnlyUrl(event?.listing?.url || event?.listing?.directUrl || event?.listing?.purchaseUrl));
+    const albumsById = new Map(vault.albums.map(album => [album.id, album]));
+    vault.matchEvents = vault.matchEvents
+      .filter(event => !isKnownDigitalOnlyUrl(event?.listing?.url || event?.listing?.directUrl || event?.listing?.purchaseUrl))
+      .map(event => {
+        const listing = canonicalDiscogsListing(event.listing, albumsById.get(event.albumId));
+        return listing ? { ...event, listing } : null;
+      })
+      .filter(Boolean);
     return vault;
   } catch (error) {
     return {
@@ -784,11 +863,11 @@ function runAvailabilityScan(limit = null, options = {}) {
   return started.completion || Promise.resolve(started);
 }
 
-function runAppleMusicSync() {
-  if (syncRunning) return Promise.resolve({ ok: false, skipped: true, message: "Apple Music sync already running" });
+function runLibrarySync() {
+  if (syncRunning) return Promise.resolve({ ok: false, skipped: true, message: "Music library sync already running" });
   syncRunning = true;
   lastSyncError = "";
-  lastSyncMessage = `Apple Music sync started at ${new Date().toISOString()}`;
+  lastSyncMessage = `Music library sync started at ${new Date().toISOString()}`;
   return new Promise(resolve => {
     try {
       if (fs.existsSync(syncResultPath)) fs.unlinkSync(syncResultPath);
@@ -807,7 +886,7 @@ function runAppleMusicSync() {
       if (syncProcess === child) syncProcess = null;
       syncRunning = false;
       if (code !== 0) {
-        lastSyncError = error || output || `Apple Music sync exited with ${code}`;
+        lastSyncError = error || output || `Music library sync exited with ${code}`;
         lastSyncMessage = lastSyncError;
         resolve({ ok: false, error: lastSyncError });
         return;
@@ -837,7 +916,7 @@ function startLibraryWatcher() {
   try {
     libraryWatcher = fs.watch(musicRoot, { recursive: true }, () => {
       clearTimeout(libraryWatchTimer);
-      libraryWatchTimer = setTimeout(() => runAppleMusicSync().catch(error => {
+      libraryWatchTimer = setTimeout(() => runLibrarySync().catch(error => {
         lastSyncError = error.message;
         lastSyncMessage = error.message;
       }), 2500);
@@ -863,14 +942,14 @@ function buildSystemHealth(vault) {
       startedAt: serverStartedAt,
       uptimeSeconds: Math.round(process.uptime())
     },
-    appleMusicSync: {
+    librarySync: {
       ok: !lastSyncError,
       running: syncRunning,
       intervalMs: syncIntervalMs,
       sourceAvailable: fs.existsSync(musicRoot),
       lastSynced: vault.lastSynced || null,
       lastCompletedAt: lastSyncCompletedAt || null,
-      message: publicRuntimeMessage(lastSyncMessage) || "Apple Music sync has not run in this server session.",
+      message: publicRuntimeMessage(lastSyncMessage) || "Music library sync has not run in this server session.",
       sync: vault.sync || {},
       watcher: libraryWatcherStatus
     },
@@ -987,7 +1066,7 @@ const server = http.createServer(async (req, res) => {
           send(res, 404, JSON.stringify({ ok: false, message: "Album not found." }), types[".json"]);
           return;
         }
-        if (album.source === "apple-music-folder") {
+        if (album.sourcePath || (album.sourcePaths || []).length || album.source === "music-folder") {
           send(res, 409, JSON.stringify({ ok: false, message: "Synced albums stay linked to the music library. Mark this album Not Interested instead." }), types[".json"]);
           return;
         }
@@ -1033,6 +1112,31 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (req.url === "/api/library-source" && req.method === "POST") {
+      if (!isLocalRequest(req)) {
+        send(res, 403, JSON.stringify({ ok: false, message: "The source folder can only be changed on the host PC." }), types[".json"]);
+        return;
+      }
+      if (syncRunning) {
+        send(res, 409, JSON.stringify({ ok: false, message: "Wait for the current library sync to finish, then try again." }), types[".json"]);
+        return;
+      }
+      const payload = JSON.parse(await readBody(req));
+      let nextSettings;
+      try {
+        nextSettings = setLibraryRoot(payload.path);
+      } catch (error) {
+        send(res, 400, JSON.stringify({ ok: false, message: error.message }), types[".json"]);
+        return;
+      }
+      runLibrarySync().catch(error => {
+        lastSyncError = error.message;
+        lastSyncMessage = error.message;
+      });
+      send(res, 202, JSON.stringify({ ok: true, settings: nextSettings, message: "Source folder connected. Library sync has started." }), types[".json"]);
+      return;
+    }
+
     if (req.url === "/api/scan-plan" && req.method === "GET") {
       send(res, 200, JSON.stringify(getDailyScanPlan(readVault())), types[".json"]);
       return;
@@ -1072,9 +1176,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.url === "/api/shutdown" && req.method === "POST") {
-      const remoteAddress = req.socket.remoteAddress || "";
-      const localRequest = remoteAddress === "127.0.0.1" || remoteAddress === "::1" || remoteAddress === "::ffff:127.0.0.1";
-      if (!localRequest) {
+      if (!isLocalRequest(req)) {
         send(res, 403, JSON.stringify({ ok: false, message: "Local access only" }), types[".json"]);
         return;
       }
@@ -1106,11 +1208,11 @@ server.listen(port, bindHost, () => {
   if (testMode) return;
   startLibraryWatcher();
   setTimeout(() => runNetworkTest().catch(error => { lastNetworkStatus = { ok: false, message: error.message, checkedAt: new Date().toISOString(), checks: {} }; }), 500);
-  setTimeout(() => runAppleMusicSync().catch(error => { lastSyncError = error.message; lastSyncMessage = error.message; }), 1000);
+  setTimeout(() => runLibrarySync().catch(error => { lastSyncError = error.message; lastSyncMessage = error.message; }), 1000);
   setTimeout(() => refreshExchangeRates()
     .finally(() => runAvailabilityScan().catch(error => { lastScannerMessage = error.message; })), 10000);
   setInterval(() => runNetworkTest().catch(error => { lastNetworkStatus = { ok: false, message: error.message, checkedAt: new Date().toISOString(), checks: {} }; }), scanIntervalMs);
-  setInterval(() => runAppleMusicSync().catch(error => { lastSyncError = error.message; lastSyncMessage = error.message; }), syncIntervalMs);
+  setInterval(() => runLibrarySync().catch(error => { lastSyncError = error.message; lastSyncMessage = error.message; }), syncIntervalMs);
   setInterval(() => runAvailabilityScan().catch(error => { lastScannerMessage = error.message; }), scanIntervalMs);
   setInterval(() => refreshExchangeRates(), 24 * 60 * 60 * 1000);
 });

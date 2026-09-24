@@ -1,5 +1,18 @@
 # Changelog
 
+## 3.1.0 - 2026-09-24
+
+### Added
+
+- Host-only source-folder configuration for any `<Artist>/<Album>` music library.
+- Vendor-neutral CSV/JSON catalogue import guidance.
+
+### Changed
+
+- Release identity verification now uses Discogs across every music genre.
+- Album artwork is center-cropped into stable square containers at every responsive breakpoint.
+- Library sync language and health reporting are provider-neutral.
+
 ## 3.0.0 - 2026-09-24
 
 ### Added

@@ -821,8 +821,21 @@
 
           <section class="settings-section">
             <h3>Library and data</h3>
-            <p class="subtle">Automatic folder sync is the primary source. CSV and JSON tools are available for migration and backup.</p>
-            <label class="label" for="libraryFile">Import library file</label>
+            <p class="subtle">Connect any Artist/Album folder tree, or import a catalogue exported by your digital music service.</p>
+            <div class="settings-control">
+              <div>
+                <strong>Synced source folder</strong>
+                <p id="libraryFolderStatus" class="subtle">Checking the current source.</p>
+              </div>
+              <div class="settings-form library-source-form">
+                <label>
+                  <span class="label">Folder path on this PC</span>
+                  <input id="libraryFolderPath" type="text" autocomplete="off" placeholder="C:\Music">
+                </label>
+                <button id="saveLibraryFolderButton" class="primary" type="button">Use folder</button>
+              </div>
+            </div>
+            <label class="label" for="libraryFile">Import catalogue file</label>
             <div class="file-zone">
               <input id="libraryFile" type="file" accept=".csv,.txt,.json">
               <button id="sampleButton" type="button">Load sample library</button>
@@ -833,7 +846,7 @@
               <button id="importStatusButton" type="button">Import availability JSON</button>
               <input id="availabilityFile" type="file" accept=".json" hidden>
             </div>
-            <p class="subtle">Accepted columns include Album, Artist, Album Artist, Genre, Year, Date Added, Format and Artwork URL.</p>
+            <p class="subtle">CSV and JSON imports accept Album, Artist, Album Artist, Genre, Year, Date Added, Format and Artwork URL columns.</p>
           </section>
 
           <section class="settings-section">
@@ -961,6 +974,9 @@
       searchProvider: document.getElementById("searchProvider"),
       searxngUrl: document.getElementById("searxngUrl"),
       saveSearchSettingsButton: document.getElementById("saveSearchSettingsButton"),
+      libraryFolderPath: document.getElementById("libraryFolderPath"),
+      libraryFolderStatus: document.getElementById("libraryFolderStatus"),
+      saveLibraryFolderButton: document.getElementById("saveLibraryFolderButton"),
       timeZoneValue: document.getElementById("timeZoneValue"),
       dashboardSubtitle: document.getElementById("dashboardSubtitle"),
       selectDailyScanButton: document.getElementById("selectDailyScanButton"),
@@ -1690,7 +1706,7 @@
       const outsideRange = getRangeNotifications("outside");
       const available = inRange.length ? inRange : getNewAvailability();
       if (!available.length && !outsideRange.length) {
-        els.noticeBoard.innerHTML = `<div class="notice"><div><strong>0 verified available listings in total</strong><span class="subtle">Available means the selected physical format, a live price, Add To Cart or Buy Now, Discogs confirmation, and an Encyclopedia Metallum check.</span></div><button class="mini-button" type="button" data-view-target="search">Search Vault</button></div>`;
+        els.noticeBoard.innerHTML = `<div class="notice"><div><strong>0 verified available listings in total</strong><span class="subtle">Available means the selected physical format, a live price, Add To Cart or Buy Now, and Discogs confirmation.</span></div><button class="mini-button" type="button" data-view-target="search">Search Vault</button></div>`;
         return;
       }
       const summaryHtml = `<div class="notice"><div><strong>${totalAvailable} verified available listings in total</strong><span class="subtle">Successful Matches Today shows previously unseen seller links. Top 100 ranks current results by priority.</span></div></div>`;
@@ -1805,7 +1821,7 @@
       const health = state.vaultMeta?.systemHealth;
       const scan = state.vaultMeta?.lastScanSummary;
       const scanner = health?.availabilityScanner || state.vaultMeta?.scannerStatus || {};
-      const sync = health?.appleMusicSync || state.vaultMeta?.syncStatus || {};
+      const sync = health?.librarySync || state.vaultMeta?.syncStatus || {};
       const server = health?.server || {};
       const trusted = health?.trustedVendors || {};
       const outbound = health?.outboundWeb || {};
@@ -1851,7 +1867,7 @@
           <p class="subtle">Updated: ${escapeHtml(agent.updatedAt ? new Date(agent.updatedAt).toLocaleString() : "not yet")}</p>
         </div>
         <div class="health-item">
-          <strong>Apple Music Sync</strong>
+          <strong>Music Library Sync</strong>
           <span class="${sync.ok === false ? "health-warn" : "health-ok"}">${sync.running ? "Syncing now" : sync.ok === false ? "Needs attention" : "Scheduled"}</span>
           <p class="subtle">${sync.watcher?.active ? "Watching for changes now" : `Reconciles every ${escapeHtml(formatInterval(sync.intervalMs))}`}. ${escapeHtml(syncCounts)}</p>
           <p class="subtle">${escapeHtml(sync.message || "No sync message yet.")}</p>
@@ -1860,7 +1876,7 @@
           <strong>Outbound Web</strong>
           <span class="${outbound.ok === false ? "health-warn" : "health-ok"}">${outbound.running ? "Testing" : outbound.ok === true ? "Working" : outbound.ok === false ? "Needs attention" : "Waiting for first test"}</span>
           <p class="subtle">${escapeHtml(outbound.message || "No outbound web test has run yet.")}</p>
-          <p class="subtle">${escapeHtml(outboundDetail || "Internet, free search, Discogs and Encyclopedia Metallum checks pending.")}</p>
+          <p class="subtle">${escapeHtml(outboundDetail || "Internet, free search and Discogs checks pending.")}</p>
           <p class="subtle">Last test: ${escapeHtml(outbound.checkedAt ? new Date(outbound.checkedAt).toLocaleString() : "not yet")}</p>
         </div>
         <div class="health-item">
@@ -1901,6 +1917,13 @@
       els.searxngUrl.value = settings.searxngUrl || "";
       els.searxngUrl.disabled = els.searchProvider.value !== "searxng";
       els.timeZoneValue.textContent = settings.timeZone || deviceTimeZone();
+      const folderName = settings.libraryFolderName || "Music";
+      els.libraryFolderStatus.textContent = settings.libraryFolderAvailable
+        ? `${folderName} is connected and checked every 10 minutes.`
+        : `${folderName} is unavailable. Enter an Artist/Album source folder on this PC.`;
+      els.libraryFolderPath.disabled = settings.libraryFolderLocked === true || !state.serverMode;
+      els.saveLibraryFolderButton.disabled = settings.libraryFolderLocked === true || !state.serverMode;
+      els.libraryFolderPath.placeholder = settings.libraryFolderLocked === true ? "Controlled by MUSIC_ROOT" : "C:\\Music";
       els.dashboardSubtitle.textContent = `Live library sync · ${settings.timeZone || deviceTimeZone()} · ${settings.currency || deviceCurrency()}`;
       els.selectDailyScanButton.disabled = !state.serverMode;
       els.scanSelectedBatchButton.disabled = !state.serverMode || scanner.running || !planInfo.pending || !planInfo.requestsRemaining;
@@ -2259,6 +2282,38 @@
       }
     }
 
+    async function saveLibraryFolder() {
+      if (!state.serverMode) {
+        showToast("Start the local dashboard before connecting a source folder.");
+        return;
+      }
+      const folderPath = els.libraryFolderPath.value.trim();
+      if (!folderPath) {
+        showToast("Enter the complete folder path from this PC.");
+        return;
+      }
+      els.saveLibraryFolderButton.disabled = true;
+      try {
+        const response = await fetch("/api/library-source", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: folderPath })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.message || "Source folder could not be connected");
+        state.vaultMeta = { ...(state.vaultMeta || {}), settings: result.settings };
+        els.libraryFolderPath.value = "";
+        renderSettings();
+        renderHealth();
+        showToast(result.message || "Source folder connected.");
+        setTimeout(() => loadVaultFromServer(), 1200);
+      } catch (error) {
+        showToast(error.message || "Source folder could not be connected.");
+      } finally {
+        els.saveLibraryFolderButton.disabled = state.vaultMeta?.settings?.libraryFolderLocked === true || !state.serverMode;
+      }
+    }
+
     async function selectDailyScanPlan(quiet = false) {
       if (!state.serverMode) {
         showToast("Start the local dashboard before selecting today's albums.");
@@ -2322,6 +2377,7 @@
       els.searxngUrl.disabled = els.searchProvider.value !== "searxng";
     });
     els.saveSearchSettingsButton.addEventListener("click", saveSearchSettings);
+    els.saveLibraryFolderButton.addEventListener("click", saveLibraryFolder);
     els.selectDailyScanButton.addEventListener("click", () => selectDailyScanPlan(false));
     els.scanSelectedBatchButton.addEventListener("click", refreshAvailability);
     els.dailyScanSelection.addEventListener("click", event => {

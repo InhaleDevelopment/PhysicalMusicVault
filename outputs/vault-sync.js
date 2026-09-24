@@ -4,7 +4,7 @@ const path = require("path");
 const { normaliseAlbum } = require("./catalog-model");
 const { atomicWriteJson, findAlbumArtwork } = require("./vault-platform");
 
-const musicRoot = process.argv[2] || path.join(os.homedir(), "Music", "Apple Music", "Media", "Music");
+const musicRoot = process.argv[2] || path.join(os.homedir(), "Music");
 const vaultPath = process.argv[3] || path.join(__dirname, "vault-data.json");
 const outputPath = process.argv[4] || vaultPath;
 const defaultCurrency = ["AUD", "USD", "GBP", "EUR"].includes(String(process.env.DEFAULT_CURRENCY || "").toUpperCase())
@@ -24,7 +24,7 @@ function readVault() {
   } catch {
     return {
       schemaVersion: 2,
-      source: "Apple Music folder",
+      source: "Local music folder",
       musicRoot,
       lastSynced: null,
       albums: [],
@@ -81,7 +81,7 @@ function folderAlbum(folderPath, now) {
     sourcePath: folderPath,
     artworkPath: findAlbumArtwork(folderPath),
     folderDepth: parts.length,
-    source: "apple-music-folder",
+    source: "music-folder",
     firstSeen: now,
     lastSeen: now,
     lastChecked: "",
@@ -165,11 +165,12 @@ function main() {
   const albums = [...discovered.values()];
   for (const album of vault.albums || []) {
     if (!album.id || seen.has(album.id)) continue;
-    if (album.source !== "apple-music-folder") {
+    const hasFolderSource = Boolean(album.sourcePath || (album.sourcePaths || []).length);
+    if (!hasFolderSource) {
       albums.push({ ...normaliseAlbum(album), missing: false });
       continue;
     }
-    const legacyGeneratedFolder = album.source === "apple-music-folder" && Number(album.folderDepth || 0) !== 2;
+    const legacyGeneratedFolder = Number(album.folderDepth || 0) !== 2;
     if (!legacyGeneratedFolder) albums.push({ ...normaliseAlbum(album), missing: true });
   }
 
@@ -184,7 +185,7 @@ function main() {
   const output = {
     ...vault,
     schemaVersion: 2,
-    source: "Apple Music folder",
+    source: "Local music folder",
     musicRoot,
     lastSynced: now,
     albums,

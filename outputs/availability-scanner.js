@@ -41,7 +41,6 @@ const blockedHosts = [
   "policies.google.",
   "allmusic.",
   "besteveralbums.",
-  "metal-archives.",
   "rateyourmusic.",
   "wikipedia.",
   "youtube."
@@ -305,18 +304,15 @@ function findIdentityResult(results, hostFragment, album) {
   return (results || []).find(result => vendorHost(result.url).includes(hostFragment) && resultMatchesAlbum(result, album)) || null;
 }
 
-function identityVerification(album, discogsSearch, metallumSearch) {
+function identityVerification(album, discogsSearch) {
   const discogs = findIdentityResult(discogsSearch?.results, "discogs.com", album);
-  const metallum = findIdentityResult(metallumSearch?.results, "metal-archives.com", album);
   const sources = [
-    { source: "Discogs", url: discogs?.url || "", verified: Boolean(discogs), checked: true },
-    { source: "Encyclopedia Metallum", url: metallum?.url || "", verified: Boolean(metallum), checked: true }
+    { source: "Discogs", url: discogs?.url || "", verified: Boolean(discogs), checked: true }
   ];
   return {
-    ok: Boolean(discogs || metallum),
-    source: discogs && metallum ? "Discogs + Encyclopedia Metallum" : discogs ? "Discogs (Metallum checked)" : metallum ? "Encyclopedia Metallum (Discogs checked)" : "Discogs and Metallum checked",
-    url: discogs?.url || metallum?.url || "",
-    metallumUrl: metallum?.url || "",
+    ok: Boolean(discogs),
+    source: "Discogs",
+    url: discogs?.url || "",
     sources,
     method: "independent-web-cross-check"
   };
@@ -326,7 +322,6 @@ async function discoverAlbum(album, settings) {
   const limit = Math.max(10, Math.min(50, Number(settings.searchResultLimit || 20)));
   const primary = await searchWeb(googleQuery(album), settings, { limit });
   let discogsSearch = { provider: primary.provider, query: primary.query, results: primary.results };
-  let metallumSearch = { provider: primary.provider, query: primary.query, results: primary.results };
   if (!findIdentityResult(primary.results, "discogs.com", album)) {
     const query = `site:discogs.com ${cleanField(album.artist)} - ${cleanField(album.album)}`;
     try {
@@ -335,15 +330,7 @@ async function discoverAlbum(album, settings) {
       discogsSearch = { provider: primary.provider, query, results: [], error: error.message };
     }
   }
-  if (!findIdentityResult(primary.results, "metal-archives.com", album)) {
-    const query = `site:metal-archives.com ${cleanField(album.artist)} - ${cleanField(album.album)}`;
-    try {
-      metallumSearch = await searchWeb(query, settings, { limit: 10 });
-    } catch (error) {
-      metallumSearch = { provider: primary.provider, query, results: [], error: error.message };
-    }
-  }
-  return { primary, discogsSearch, metallumSearch };
+  return { primary, discogsSearch };
 }
 
 async function verifyCandidate(album, candidate, trustedVendors, discogs, settings) {
@@ -365,7 +352,7 @@ async function verifyCandidate(album, candidate, trustedVendors, discogs, settin
       reason: "Direct page did not prove the exact album, selected physical format, price, and Add To Cart or Buy Now."
     };
   }
-  if (!discogs.ok) return { accepted: false, reason: "Discogs and Encyclopedia Metallum could not verify the release identity." };
+  if (!discogs.ok) return { accepted: false, reason: "Discogs could not verify the release identity." };
 
   const host = vendorHost(finalUrl);
   const verifiedAt = new Date().toISOString();
@@ -394,7 +381,6 @@ async function verifyCandidate(album, candidate, trustedVendors, discogs, settin
     identityUrl: discogs.url,
     identityMethod: discogs.method,
     identitySources: discogs.sources,
-    metallumUrl: discogs.metallumUrl,
     trustedVendorScore: trustedScore(finalUrl, trustedVendors),
     listingFoundAt: verifiedAt,
     lastVerifiedAt: verifiedAt,
@@ -413,7 +399,7 @@ async function scanAlbum(album, trustedVendors, settings) {
     status: album.status || "wanted",
     priority: album.priority,
     lastChecked: new Date().toISOString(),
-    searchOrder: ["Exact web query", "Discogs identity check", "Encyclopedia Metallum identity check", "Direct seller-page verification"],
+    searchOrder: ["Exact web query", "Discogs identity check", "Direct seller-page verification"],
     googleQuery: googleQuery(album),
     googleSearchUrl: googleSearchUrl(album),
     scanCompleted: true,
@@ -435,21 +421,20 @@ async function scanAlbum(album, trustedVendors, settings) {
   }
 
   update.searchProvider = discovery.primary.provider;
-  update.searchQueries = [discovery.primary.query, discovery.discogsSearch.query, discovery.metallumSearch.query]
+  update.searchQueries = [discovery.primary.query, discovery.discogsSearch.query]
     .filter((query, index, values) => query && values.indexOf(query) === index);
-  const discogs = identityVerification(album, discovery.discogsSearch, discovery.metallumSearch);
+  const discogs = identityVerification(album, discovery.discogsSearch);
   update.discogsVerificationUrl = discogs.url;
   update.identitySource = discogs.source;
   update.identityUrl = discogs.url;
   update.identityMethod = discogs.method;
   update.identitySources = discogs.sources;
-  update.metallumVerificationUrl = discogs.metallumUrl;
   if (!discogs.ok) {
     update.availabilityStatus = "unavailable";
     update.verifiedPurchase = false;
     update.identityVerified = false;
     update.purchaseActionFound = false;
-    update.notes = "The exact artist and album could not be confirmed by Discogs or Encyclopedia Metallum.";
+    update.notes = "The exact artist and album could not be confirmed by Discogs.";
     return update;
   }
 

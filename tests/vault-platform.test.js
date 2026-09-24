@@ -13,6 +13,7 @@ const {
 test("public vault responses never expose local filesystem paths", () => {
   const payload = publicVault({
     musicRoot: "C:\\Users\\person\\Music",
+    libraryRoot: "C:\\Users\\person\\Music",
     albums: [{
       id: "artist-album",
       artist: "Artist",
@@ -21,7 +22,7 @@ test("public vault responses never expose local filesystem paths", () => {
       sourcePaths: ["C:\\Users\\person\\Music\\Artist\\Album"],
       artworkPath: "C:\\Users\\person\\Music\\Artist\\Album\\Folder.jpg"
     }],
-    systemHealth: { appleMusicSync: { musicRoot: "C:\\Users\\person\\Music" } }
+    systemHealth: { librarySync: { libraryRoot: "C:\\Users\\person\\Music" } }
   });
 
   const text = JSON.stringify(payload);
@@ -37,6 +38,7 @@ test("settings updates are allowlisted and bounded", () => {
     dailyScanLimit: -4,
     searchProvider: "unknown",
     apiKey: "do-not-store",
+    libraryRoot: "C:\\private-library",
     currency: "gbp",
     timeZone: "Australia/Sydney"
   });
