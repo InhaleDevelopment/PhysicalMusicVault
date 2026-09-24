@@ -1,0 +1,21 @@
+{
+  "name": "physical-music-vault",
+  "version": "3.0.0",
+  "private": true,
+  "description": "A local Apple Music library and physical release availability dashboard.",
+  "main": "outputs/vault-server.js",
+  "scripts": {
+    "start": "node outputs/vault-server.js",
+    "sync": "node outputs/vault-sync.js",
+    "test": "node --test tests/*.test.js",
+    "check": "node --check outputs/catalog-model.js && node --check outputs/vault-platform.js && node --check outputs/scan-plan.js && node --check outputs/web-search.js && node --check outputs/availability-scanner.js && node --check outputs/vault-sync.js && node --check outputs/vault-server.js && node --check outputs/vault-agent.js && node --check outputs/vault-toggle.js",
+    "verify": "npm run check && npm test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "cheerio": "^1.1.2"
+  },
+  "license": "MIT"
+}

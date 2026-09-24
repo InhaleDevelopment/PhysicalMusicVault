@@ -1,0 +1,20 @@
+{
+  "albums": [
+    {
+      "artist": "Example Artist",
+      "album": "Example Album",
+      "status": "available",
+      "format": "cd",
+      "currentCost": "$24.99",
+      "minPrice": "$0",
+      "maxPrice": "$35",
+      "currency": "$",
+      "marketplace": "Google",
+      "directUrl": "https://example-record-store.test/example-album-cd",
+      "purchaseUrl": "https://www.google.com/search?q=Example%20Artist%20-%20Example%20Album%20cd%20buy",
+      "availableAt": "2026-07-05T00:00:00.000Z",
+      "lastChecked": "2026-07-05T00:00:00.000Z",
+      "notes": "Scanner found a currently available CD listing."
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+# Physical Music Vault
+
+Physical Music Vault is a local-first dashboard that turns a digital music folder into a physical-release watchlist. It syncs artist and album folders, lets each user decide what is Wanted, Owned, or Not Interested, and links only to seller pages that can be verified as purchasable.
+
+Version 3 is a dependency-light Node.js application with no account, cloud database, paid search API, or build step. Windows hosts the service; current desktop and mobile browsers provide the interface.
+
+## Product Flow
+
+1. Watch `Music/Apple Music/Media/Music/<Artist>/<Album>` for changes and reconcile the folder every 10 minutes.
+2. Keep catalogue status separate from a 1-5 purchase priority and a per-album price range.
+3. Select up to 500 Wanted albums per local calendar day, highest priority first.
+4. Search the exact query `Artist - Album buy` using a free, keyless provider or an optional self-hosted SearXNG instance.
+5. Cross-check the release against Discogs and Encyclopedia Metallum.
+6. Accept a result only when the direct seller page proves the artist, album, physical format, numeric price, and an active purchase control.
+7. Show new finds, the Top 100 priority-ranked available albums, and all current priority 5 matches.
+
+Local album artwork is served through album IDs and never exposes its filesystem path to the browser.
+
+Prices are converted among AUD, USD, GBP, and EUR using daily reference rates from the keyless [Frankfurter API](https://frankfurter.dev/).
+
+## Windows Setup
+
+1. Install Node.js 20 or newer, including npm.
+2. Double-click `outputs/Vault On-Off.cmd`.
+3. The first start installs the open-source parser dependency and opens `http://localhost:8787/`.
+4. Mark albums Wanted, Owned, or Not Interested and set priority, format, and price range.
+5. Select **Today's 500**, then use **Scan Next 25** or leave 30-minute automation enabled.
+
+Double-click `Vault On-Off.cmd` again to stop the dashboard. The built-in provider needs no API key, account, card, or paid plan.
+
+## Search Providers
+
+- **Built-in keyless search** is the default and works without configuration. It is best effort and may be temporarily rate-limited by the upstream service.
+- **Self-hosted SearXNG** is optional. Set its URL in Settings when greater control and multiple search engines are needed.
+
+No search product can guarantee every item on the public internet. Shops may be unindexed, require a login, render only in a browser, or block automated access. The vault aims for broad indexed coverage and rejects results it cannot verify rather than presenting uncertain purchase links.
+
+Known digital-only stores are excluded even when a page uses phrases such as “CD quality.” Indirect review, video, wiki, and search pages can help confirm identity but are never accepted as seller links.
+
+## iPhone And iPad
+
+Turn on **iPhone and iPad access** in Settings, turn the vault off and on once, then use the private-network URL shown in Settings. The PC and mobile device must be on the same trusted home network. Do not allow public-network access.
+
+## Privacy
+
+- Library data, preferences, scan history, and trusted vendors stay in ignored files under `outputs/`.
+- Search requests contain artist, album, format, and public search terms only. Local paths and Apple account information are never sent.
+- The browser reports its IANA timezone to the local server so daily queues and timestamps match the user's device.
+- The app does not change Windows proxy, DNS, hosts, or firewall settings. It makes ordinary outbound HTTPS requests from Node.js.
+- The server binds to localhost by default; private-network listening is opt-in.
+
+No username, library path, API key, or personal catalogue is included in the repository.
+
+## Listing Rules
+
+A listing is accepted only when:
+
+1. Discogs or Encyclopedia Metallum confirms the artist and release after both sources are searched.
+2. The seller page itself matches the artist and album.
+3. The selected physical format is present.
+4. A numeric price is present.
+5. Add To Cart, Add To Basket, Buy Now, or Buy It Now is present.
+6. Structured stock data does not mark the item unavailable.
+
+Accepted seller domains are stored locally as trusted vendors and prioritised in later scans. Search-result redirect URLs are never used as purchase links.
+
+## Development
+
+```powershell
+npm install
+npm run verify
+npm start
+```
+
+Local data and settings are excluded by `.gitignore`. Before publishing, run `git status --ignored` and confirm that `vault-data.json`, `settings.json`, scan results, logs, and library exports are ignored.
+
+See [Architecture](docs/ARCHITECTURE.md), [User Journeys](docs/USER-JOURNEYS.md), [Contributing](CONTRIBUTING.md), and [Security](SECURITY.md) before changing service boundaries or preparing a release.

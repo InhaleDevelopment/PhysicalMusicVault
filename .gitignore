@@ -1,0 +1,23 @@
+node_modules/
+.DS_Store
+
+# Private local configuration and credentials
+/outputs/gemini-api-key.txt
+/outputs/settings.json
+
+# Personal library data and generated scan state
+/outputs/vault-data.json
+/outputs/vault-data.*.json
+/outputs/vault-sync-results.json
+/outputs/daily-scan-plan.json
+/outputs/availability-scan-results.json
+/outputs/trusted-vendors.json
+/outputs/agent-status.json
+/outputs/apple-music-folder-import.csv
+/outputs/vault-stop.request
+/outputs/availability-scanner.lock
+
+# Runtime logs
+/outputs/*.log
+/outputs/logs/
+/outputs/backups/

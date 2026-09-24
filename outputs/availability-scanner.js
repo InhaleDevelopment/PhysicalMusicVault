@@ -1,0 +1,616 @@
+const fs = require("fs");
+const path = require("path");
+const { load } = require("cheerio");
+const {
+  DEFAULT_DAILY_LIMIT,
+  ensureDailyPlan,
+  loadPlan,
+  nextBatch,
+  planSummary,
+  recordRequest,
+  recordResult,
+  savePlan
+} = require("./scan-plan");
+const { convertCurrency, isKnownDigitalOnlyUrl, normaliseAlbum, normaliseCurrency } = require("./catalog-model");
+const { searchWeb } = require("./web-search");
+const { atomicWriteJson } = require("./vault-platform");
+
+const root = __dirname;
+const dataRoot = process.env.VAULT_DATA_DIR ? path.resolve(process.env.VAULT_DATA_DIR) : root;
+fs.mkdirSync(dataRoot, { recursive: true });
+const vaultPath = process.argv[2] ? path.resolve(process.argv[2]) : path.join(dataRoot, "vault-data.json");
+const batchLimit = Math.max(1, Number(process.env.SCAN_LIMIT || process.argv[3] || 25));
+const delayMs = Math.max(0, Number(process.env.SCAN_DELAY_MS || 5000));
+const settingsPath = path.join(dataRoot, "settings.json");
+const planPath = path.join(dataRoot, "daily-scan-plan.json");
+const trustedVendorsPath = path.join(dataRoot, "trusted-vendors.json");
+const scannerLockPath = path.join(dataRoot, "availability-scanner.lock");
+const maxTextLength = 7500;
+const maxRejected = 25;
+const outboundWebDisabled = /^(1|true|yes)$/i.test(String(process.env.VAULT_DISABLE_WEB || ""));
+
+const blockedHosts = [
+  "google.",
+  "duckduckgo.",
+  "bing.",
+  "search.yahoo.",
+  "vertexaisearch.cloud.google.com",
+  "webcache.googleusercontent.",
+  "accounts.google.",
+  "support.google.",
+  "policies.google.",
+  "allmusic.",
+  "besteveralbums.",
+  "metal-archives.",
+  "rateyourmusic.",
+  "wikipedia.",
+  "youtube."
+];
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function reportToParent(message) {
+  if (typeof process.send !== "function") return;
+  try {
+    process.send(message);
+  } catch {}
+}
+
+function readJson(filePath, fallback = {}) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/, ""));
+  } catch {
+    return fallback;
+  }
+}
+
+function acquireScannerLock() {
+  try {
+    const handle = fs.openSync(scannerLockPath, "wx");
+    fs.writeFileSync(handle, String(process.pid), "utf8");
+    fs.closeSync(handle);
+    return;
+  } catch (error) {
+    if (error.code !== "EEXIST") throw error;
+  }
+
+  const existingPid = Number(fs.readFileSync(scannerLockPath, "utf8"));
+  try {
+    process.kill(existingPid, 0);
+    throw new Error(`Availability scanner is already running as process ${existingPid}.`);
+  } catch (error) {
+    if (error.message?.startsWith("Availability scanner is already running")) throw error;
+    fs.unlinkSync(scannerLockPath);
+    acquireScannerLock();
+  }
+}
+
+function releaseScannerLock() {
+  try {
+    if (Number(fs.readFileSync(scannerLockPath, "utf8")) === process.pid) fs.unlinkSync(scannerLockPath);
+  } catch {}
+}
+
+function loadSettings() {
+  return {
+    searchProvider: "duckduckgo",
+    searxngUrl: "",
+    searchResultLimit: 20,
+    maxListingsPerAlbum: 12,
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+    dailyScanLimit: DEFAULT_DAILY_LIMIT,
+    exchangeRatesToAud: { AUD: 1, USD: 1.52, EUR: 1.65, GBP: 1.95 },
+    ...readJson(settingsPath)
+  };
+}
+
+function makeId(artist, album) {
+  return `${artist}::${album}`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function normaliseText(value) {
+  return String(value || "")
+    .slice(0, maxTextLength)
+    .toLowerCase()
+    .replace(/&amp;|&#38;/g, "&")
+    .replace(/&quot;|&#34;/g, "\"")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function cleanField(value, fallback = "") {
+  return String(value || fallback).replace(/\s+/g, " ").trim().slice(0, 240);
+}
+
+function cleanUrl(value) {
+  return String(value || "").trim().slice(0, 1000);
+}
+
+function vendorHost(url) {
+  try {
+    return new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+function isBlockedUrl(url) {
+  const host = vendorHost(url);
+  return !host || blockedHosts.some(blocked => host.includes(blocked));
+}
+
+function loadTrustedVendors() {
+  const payload = readJson(trustedVendorsPath, { vendors: [] });
+  return Array.isArray(payload.vendors) ? payload.vendors : [];
+}
+
+function trustedScore(url, trustedVendors) {
+  const host = vendorHost(url);
+  const match = trustedVendors.find(vendor => host === vendor.host || host.endsWith(`.${vendor.host}`));
+  return match ? Number(match.acceptedCount || 1) : 0;
+}
+
+function addRejected(update, item) {
+  if (update.rejected.length >= maxRejected) return;
+  update.rejected.push({
+    url: cleanUrl(item.url),
+    reason: cleanField(item.reason, "Rejected")
+  });
+}
+
+function hasAlbumIdentity(text, album) {
+  const haystack = normaliseText(text);
+  const artist = normaliseText(album.artist);
+  const title = normaliseText(album.album);
+  if (!artist || !title || !haystack.includes(artist)) return false;
+  if (haystack.includes(title)) return true;
+  const titleTokens = [...new Set(title.split(" ").filter(token => token.length > 1))];
+  if (titleTokens.length < 3) return false;
+  const matchedTokens = titleTokens.filter(token => haystack.includes(token)).length;
+  return matchedTokens >= Math.max(2, Math.ceil(titleTokens.length * 0.8));
+}
+
+function googleQuery(album) {
+  return `${cleanField(album.artist)} - ${cleanField(album.album)} buy`;
+}
+
+function googleSearchUrl(album) {
+  return `https://www.google.com/search?q=${encodeURIComponent(googleQuery(album))}`;
+}
+
+function parsePrice(text, candidate, url, exchangeRatesToAud, budgetCurrency = "AUD") {
+  const value = String(text || "");
+  const candidateCurrency = String(candidate?.priceCurrency || "").toUpperCase();
+  const fallbackDollarCurrency = candidateCurrency === "AUD" || vendorHost(url).endsWith(".au") ? "AUD" : "USD";
+  const patterns = [
+    { currency: "AUD", pattern: /["']price["']\s*:\s*["']?(\d+(?:[.,]\d{1,2})?)["']?[\s\S]{0,160}?["']priceCurrency["']\s*:\s*["']AUD["']/i },
+    { currency: "USD", pattern: /["']price["']\s*:\s*["']?(\d+(?:[.,]\d{1,2})?)["']?[\s\S]{0,160}?["']priceCurrency["']\s*:\s*["']USD["']/i },
+    { currency: "EUR", pattern: /["']price["']\s*:\s*["']?(\d+(?:[.,]\d{1,2})?)["']?[\s\S]{0,160}?["']priceCurrency["']\s*:\s*["']EUR["']/i },
+    { currency: "GBP", pattern: /["']price["']\s*:\s*["']?(\d+(?:[.,]\d{1,2})?)["']?[\s\S]{0,160}?["']priceCurrency["']\s*:\s*["']GBP["']/i },
+    { currency: "AUD", pattern: /["']priceCurrency["']\s*:\s*["']AUD["'][\s\S]{0,160}?["']price["']\s*:\s*["']?(\d+(?:[.,]\d{1,2})?)/i },
+    { currency: "USD", pattern: /["']priceCurrency["']\s*:\s*["']USD["'][\s\S]{0,160}?["']price["']\s*:\s*["']?(\d+(?:[.,]\d{1,2})?)/i },
+    { currency: "EUR", pattern: /["']priceCurrency["']\s*:\s*["']EUR["'][\s\S]{0,160}?["']price["']\s*:\s*["']?(\d+(?:[.,]\d{1,2})?)/i },
+    { currency: "GBP", pattern: /["']priceCurrency["']\s*:\s*["']GBP["'][\s\S]{0,160}?["']price["']\s*:\s*["']?(\d+(?:[.,]\d{1,2})?)/i },
+    { currency: "AUD", pattern: /(?:A\$|AU\$|AUD)\s?(\d+(?:[.,]\d{1,2})?)/i },
+    { currency: "USD", pattern: /(?:US\$|USD)\s?(\d+(?:[.,]\d{1,2})?)/i },
+    { currency: "EUR", pattern: /(?:\u20ac|EUR)\s?(\d+(?:[.,]\d{1,2})?)/i },
+    { currency: "GBP", pattern: /(?:\u00a3|GBP)\s?(\d+(?:[.,]\d{1,2})?)/i },
+    { currency: fallbackDollarCurrency, pattern: /\$\s?(\d+(?:[.,]\d{1,2})?)/i },
+    { currency: "EUR", pattern: /(\d+(?:[.,]\d{1,2})?)\s?\u20ac/i },
+    { currency: "GBP", pattern: /(\d+(?:[.,]\d{1,2})?)\s?GBP/i }
+  ];
+  for (const item of patterns) {
+    const match = value.match(item.pattern);
+    if (!match) continue;
+    const amount = Number(match[1].replace(",", "."));
+    if (!Number.isFinite(amount) || amount <= 0) continue;
+    const aud = convertCurrency(amount, item.currency, "AUD", exchangeRatesToAud);
+    const budgetCode = normaliseCurrency(budgetCurrency);
+    const budgetAmount = convertCurrency(amount, item.currency, budgetCode, exchangeRatesToAud);
+    return {
+      amount,
+      currency: item.currency,
+      display: `${item.currency} ${amount.toFixed(2)}`,
+      aud,
+      audDisplay: aud === null ? "" : `AUD ${aud.toFixed(2)}`,
+      budgetCurrency: budgetCode,
+      budgetAmount,
+      budgetDisplay: budgetAmount === null ? "" : `${budgetCode} ${budgetAmount.toFixed(2)}`,
+      convertedPrices: Object.fromEntries(["AUD", "USD", "GBP", "EUR"].map(currency => [
+        currency,
+        convertCurrency(amount, item.currency, currency, exchangeRatesToAud)
+      ]))
+    };
+  }
+  return null;
+}
+
+function hasPurchaseAction(text) {
+  const value = String(text || "");
+  const purchaseControl = /add\s*to\s*cart|buy\s*now|buy\s*it\s*now|add\s*to\s*basket/i.test(value);
+  const structuredOutOfStock = /["']availability["']\s*:\s*["'][^"']*(?:OutOfStock|SoldOut|Discontinued)/i.test(value);
+  const structuredInStock = /["']availability["']\s*:\s*["'][^"']*(?:InStock|LimitedAvailability|PreOrder)/i.test(value);
+  const conciseUnavailable = value.length < 5000 && /out\s*of\s*stock|sold\s*out|currently\s*unavailable|notify\s*me\s*when\s*available/i.test(value);
+  return purchaseControl && !(conciseUnavailable || (structuredOutOfStock && !structuredInStock));
+}
+
+function hasPhysicalFormat(text, format) {
+  const wanted = String(format || "cd").toLowerCase();
+  const patterns = {
+    cd: /\bcd\b|compact\s+disc/i,
+    vinyl: /\bvinyl\b|\blp\b|12["”]/i,
+    cassette: /\bcassette\b|\btape\b/i,
+    "box set": /\bbox\s*set\b|\bboxset\b/i
+  };
+  return (patterns[wanted] || new RegExp(`\\b${wanted.replace(/[^a-z0-9]+/g, "\\s*")}\\b`, "i")).test(String(text || ""));
+}
+
+function productPageEvidence(html) {
+  try {
+    const $ = load(String(html || ""));
+    const values = [
+      $("title").first().text(),
+      $('meta[property="og:title"]').attr("content"),
+      $('meta[property="og:description"]').attr("content"),
+      $("h1").first().text(),
+      $('[itemprop="name"]').first().text(),
+      $('[itemprop="description"]').first().text(),
+      $('[itemprop="sku"]').first().text(),
+      $('script[type="application/ld+json"]').text(),
+      $("main").first().text().slice(0, 30000)
+    ];
+    return values.filter(Boolean).join(" ").replace(/\s+/g, " ").trim().slice(0, 60000);
+  } catch {
+    return String(html || "").slice(0, 30000);
+  }
+}
+
+async function fetchText(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      redirect: "follow",
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml"
+      }
+    });
+    if (!response.ok) {
+      const error = new Error(`HTTP ${response.status} ${response.statusText}`);
+      error.httpStatus = response.status;
+      throw error;
+    }
+    return { html: await response.text(), finalUrl: response.url || url };
+  } catch (error) {
+    const cause = error.message?.startsWith("HTTP")
+      ? error.message
+      : error.cause?.code || error.cause?.message || error.message || error.name;
+    const wrapped = new Error(`${cause}: ${url}`);
+    wrapped.httpStatus = error.httpStatus;
+    throw wrapped;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function resultMatchesAlbum(result, album) {
+  return hasAlbumIdentity(`${result?.title || ""} ${result?.snippet || ""} ${result?.url || ""}`, album);
+}
+
+function findIdentityResult(results, hostFragment, album) {
+  return (results || []).find(result => vendorHost(result.url).includes(hostFragment) && resultMatchesAlbum(result, album)) || null;
+}
+
+function identityVerification(album, discogsSearch, metallumSearch) {
+  const discogs = findIdentityResult(discogsSearch?.results, "discogs.com", album);
+  const metallum = findIdentityResult(metallumSearch?.results, "metal-archives.com", album);
+  const sources = [
+    { source: "Discogs", url: discogs?.url || "", verified: Boolean(discogs), checked: true },
+    { source: "Encyclopedia Metallum", url: metallum?.url || "", verified: Boolean(metallum), checked: true }
+  ];
+  return {
+    ok: Boolean(discogs || metallum),
+    source: discogs && metallum ? "Discogs + Encyclopedia Metallum" : discogs ? "Discogs (Metallum checked)" : metallum ? "Encyclopedia Metallum (Discogs checked)" : "Discogs and Metallum checked",
+    url: discogs?.url || metallum?.url || "",
+    metallumUrl: metallum?.url || "",
+    sources,
+    method: "independent-web-cross-check"
+  };
+}
+
+async function discoverAlbum(album, settings) {
+  const limit = Math.max(10, Math.min(50, Number(settings.searchResultLimit || 20)));
+  const primary = await searchWeb(googleQuery(album), settings, { limit });
+  let discogsSearch = { provider: primary.provider, query: primary.query, results: primary.results };
+  let metallumSearch = { provider: primary.provider, query: primary.query, results: primary.results };
+  if (!findIdentityResult(primary.results, "discogs.com", album)) {
+    const query = `site:discogs.com ${cleanField(album.artist)} - ${cleanField(album.album)}`;
+    try {
+      discogsSearch = await searchWeb(query, settings, { limit: 10 });
+    } catch (error) {
+      discogsSearch = { provider: primary.provider, query, results: [], error: error.message };
+    }
+  }
+  if (!findIdentityResult(primary.results, "metal-archives.com", album)) {
+    const query = `site:metal-archives.com ${cleanField(album.artist)} - ${cleanField(album.album)}`;
+    try {
+      metallumSearch = await searchWeb(query, settings, { limit: 10 });
+    } catch (error) {
+      metallumSearch = { provider: primary.provider, query, results: [], error: error.message };
+    }
+  }
+  return { primary, discogsSearch, metallumSearch };
+}
+
+async function verifyCandidate(album, candidate, trustedVendors, discogs, settings) {
+  const candidateUrl = cleanUrl(candidate.url);
+  if (isBlockedUrl(candidateUrl)) return { accepted: false, reason: "Search did not return a direct seller page." };
+  if (isKnownDigitalOnlyUrl(candidateUrl)) return { accepted: false, reason: "Digital-only storefronts are not physical-item listings." };
+  const { html, finalUrl } = await fetchText(candidateUrl);
+  if (isBlockedUrl(finalUrl)) return { accepted: false, reason: "The listing redirected away from a direct vendor page." };
+  if (isKnownDigitalOnlyUrl(finalUrl)) return { accepted: false, reason: "Digital-only storefronts are not physical-item listings." };
+  const productEvidence = productPageEvidence(html);
+  const pageText = `${productEvidence} ${candidate.evidence || ""}`;
+  const price = parsePrice(pageText, candidate, finalUrl, settings.exchangeRatesToAud || {}, album.budgetCurrency);
+  const purchaseActionFound = hasPurchaseAction(html);
+  const pageMatchesAlbum = hasAlbumIdentity(productEvidence, album) || hasAlbumIdentity(finalUrl, album);
+  const formatMatches = hasPhysicalFormat(productEvidence, album.format);
+  if (!price || !purchaseActionFound || !pageMatchesAlbum || !formatMatches) {
+    return {
+      accepted: false,
+      reason: "Direct page did not prove the exact album, selected physical format, price, and Add To Cart or Buy Now."
+    };
+  }
+  if (!discogs.ok) return { accepted: false, reason: "Discogs and Encyclopedia Metallum could not verify the release identity." };
+
+  const host = vendorHost(finalUrl);
+  const verifiedAt = new Date().toISOString();
+  return {
+    accepted: true,
+    listingId: `${makeId(album.artist, album.album)}-${host}-${Date.now()}`,
+    artist: cleanField(album.artist),
+    album: cleanField(album.album),
+    url: finalUrl,
+    host,
+    marketplace: cleanField(candidate.vendor, host),
+    currentCost: price.display,
+    originalCurrency: price.currency,
+    originalAmount: price.amount,
+    audPrice: price.aud,
+    audDisplay: price.audDisplay,
+    budgetCurrency: price.budgetCurrency,
+    budgetAmount: price.budgetAmount,
+    budgetDisplay: price.budgetDisplay,
+    convertedPrices: price.convertedPrices,
+    purchaseActionFound: true,
+    purchaseAction: cleanField(candidate.purchaseAction),
+    verifiedPurchase: true,
+    identityVerified: true,
+    identitySource: discogs.source,
+    identityUrl: discogs.url,
+    identityMethod: discogs.method,
+    identitySources: discogs.sources,
+    metallumUrl: discogs.metallumUrl,
+    trustedVendorScore: trustedScore(finalUrl, trustedVendors),
+    listingFoundAt: verifiedAt,
+    lastVerifiedAt: verifiedAt,
+    inStockConfirmed: true,
+    evidence: cleanField(candidate.evidence)
+  };
+}
+
+async function scanAlbum(album, trustedVendors, settings) {
+  album = normaliseAlbum(album);
+  const update = {
+    id: album.id || makeId(album.artist, album.album),
+    artist: cleanField(album.artist),
+    album: cleanField(album.album),
+    format: album.format || "cd",
+    status: album.status || "wanted",
+    priority: album.priority,
+    lastChecked: new Date().toISOString(),
+    searchOrder: ["Exact web query", "Discogs identity check", "Encyclopedia Metallum identity check", "Direct seller-page verification"],
+    googleQuery: googleQuery(album),
+    googleSearchUrl: googleSearchUrl(album),
+    scanCompleted: true,
+    listings: [],
+    rejected: []
+  };
+
+  let discovery;
+  try {
+    discovery = await discoverAlbum(album, settings);
+  } catch (error) {
+    update.scanCompleted = false;
+    update.rateLimited = error.httpStatus === 429 || error.httpStatus === 403;
+    update.notes = update.rateLimited
+      ? "The free search provider temporarily limited requests. Existing availability was left unchanged."
+      : `Web search failed. Existing availability was left unchanged. ${error.message}`;
+    addRejected(update, { url: "Web search provider", reason: error.message });
+    return update;
+  }
+
+  update.searchProvider = discovery.primary.provider;
+  update.searchQueries = [discovery.primary.query, discovery.discogsSearch.query, discovery.metallumSearch.query]
+    .filter((query, index, values) => query && values.indexOf(query) === index);
+  const discogs = identityVerification(album, discovery.discogsSearch, discovery.metallumSearch);
+  update.discogsVerificationUrl = discogs.url;
+  update.identitySource = discogs.source;
+  update.identityUrl = discogs.url;
+  update.identityMethod = discogs.method;
+  update.identitySources = discogs.sources;
+  update.metallumVerificationUrl = discogs.metallumUrl;
+  if (!discogs.ok) {
+    update.availabilityStatus = "unavailable";
+    update.verifiedPurchase = false;
+    update.identityVerified = false;
+    update.purchaseActionFound = false;
+    update.notes = "The exact artist and album could not be confirmed by Discogs or Encyclopedia Metallum.";
+    return update;
+  }
+
+  const byUrl = new Map(discovery.primary.results.map(result => [result.url, {
+    url: result.url,
+    vendor: vendorHost(result.url),
+    evidence: `${result.title}. ${result.snippet}`
+  }]));
+  const candidates = [...byUrl.values()]
+    .filter(candidate => candidate.url && !isBlockedUrl(candidate.url))
+    .sort((a, b) => trustedScore(b.url, trustedVendors) - trustedScore(a.url, trustedVendors))
+    .slice(0, Math.max(1, Math.min(25, Number(settings.maxListingsPerAlbum || 12))));
+
+  for (const candidate of candidates) {
+    try {
+      const result = await verifyCandidate(album, candidate, trustedVendors, discogs, settings);
+      if (result.accepted) update.listings.push(result);
+      else addRejected(update, { url: candidate.url, reason: result.reason });
+    } catch (error) {
+      addRejected(update, { url: candidate.url, reason: error.message });
+    }
+    await sleep(250);
+  }
+
+  if (update.listings.length) {
+    const best = update.listings[0];
+    update.availabilityStatus = "available";
+    update.verifiedPurchase = true;
+    update.identityVerified = true;
+    update.purchaseActionFound = true;
+    update.availableAt = best.listingFoundAt;
+    update.listingFoundAt = best.listingFoundAt;
+    update.currentCost = best.currentCost;
+    update.currency = best.originalCurrency;
+    update.audPrice = best.audPrice;
+    update.audDisplay = best.audDisplay;
+    update.directUrl = best.url;
+    update.purchaseUrl = best.url;
+    update.marketplace = best.marketplace;
+  } else {
+    update.availabilityStatus = "unavailable";
+    update.verifiedPurchase = false;
+    update.identityVerified = true;
+    update.purchaseActionFound = false;
+    update.purchaseUrl = update.googleSearchUrl;
+    update.marketplace = discovery.primary.provider;
+    update.notes = update.rejected.slice(0, 3).map(item => item.reason).join(" | ") || "No listing met every direct-page requirement.";
+  }
+  return update;
+}
+
+async function main() {
+  if (outboundWebDisabled) {
+    console.log("Internet scanning is disabled for dashboard-only mode.");
+    return;
+  }
+  const settings = loadSettings();
+  const vault = readJson(vaultPath, { albums: [] });
+  const trustedVendors = loadTrustedVendors();
+  let plan = ensureDailyPlan(vault, settings.dailyScanLimit, loadPlan(planPath), new Date(), { timeZone: settings.timeZone });
+  savePlan(planPath, plan);
+  const albums = nextBatch(vault, plan, batchLimit);
+  const updates = [];
+
+  reportToParent({
+    type: "scan-start",
+    batchTotal: albums.length,
+    dailyPlan: planSummary(plan)
+  });
+
+  for (let index = 0; index < albums.length; index += 1) {
+    const album = albums[index];
+    reportToParent({
+      type: "scan-progress",
+      phase: "scanning",
+      batchIndex: index,
+      batchTotal: albums.length,
+      album: { id: album.id, artist: album.artist, album: album.album }
+    });
+    recordRequest(plan, album.id);
+    savePlan(planPath, plan);
+    const update = await scanAlbum(album, trustedVendors, settings);
+    updates.push(update);
+    recordResult(
+      plan,
+      album.id,
+      update.rateLimited ? "Search provider rate limit reached" : update.listings.length ? `${update.listings.length} verified listing(s)` : update.scanCompleted ? "No verified listing" : cleanField(update.notes, "Scan failed"),
+      update.scanCompleted !== false
+    );
+    savePlan(planPath, plan);
+    reportToParent({
+      type: "album-result",
+      update,
+      batchIndex: index + 1,
+      batchTotal: albums.length,
+      dailyPlan: planSummary(plan)
+    });
+    if (update.rateLimited) break;
+    await sleep(delayMs);
+  }
+
+  const summary = planSummary(plan);
+  const outPath = path.join(dataRoot, "availability-scan-results.json");
+  const results = {
+    scannedAt: new Date().toISOString(),
+    provider: settings.searchProvider === "searxng" ? "Self-hosted SearXNG" : "DuckDuckGo keyless web search",
+    rateLimited: updates.some(album => album.rateLimited === true),
+    dailyPlan: summary,
+    queue: {
+      wantedTotal: summary.wantedSelected,
+      priorityFiveTotal: summary.priorityFiveSelected,
+      wantedScanned: updates.length,
+      priorityFiveScanned: updates.filter(album => Number(album.priority || 3) === 5).length,
+      selected: summary.selected,
+      pending: summary.pending,
+      requestsUsed: summary.requestCount,
+      requestsRemaining: summary.requestsRemaining
+    },
+    albums: updates
+  };
+  atomicWriteJson(outPath, results);
+  reportToParent({ type: "scan-complete", results });
+  console.log(`Free web search checked ${updates.length} albums. ${summary.requestsRemaining} album scans remain under the daily safety cap.`);
+}
+
+if (require.main === module) {
+  const parentPid = process.ppid;
+  let parentMonitor;
+  (async () => {
+    acquireScannerLock();
+    parentMonitor = setInterval(() => {
+      try {
+        process.kill(parentPid, 0);
+      } catch {
+        releaseScannerLock();
+        process.exit(1);
+      }
+    }, 2000);
+    parentMonitor.unref();
+    try {
+      await main();
+    } finally {
+      clearInterval(parentMonitor);
+      releaseScannerLock();
+    }
+  })().catch(error => {
+    releaseScannerLock();
+    console.error(error.message || error);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  googleQuery,
+  googleSearchUrl,
+  hasAlbumIdentity,
+  hasPhysicalFormat,
+  hasPurchaseAction,
+  identityVerification,
+  parsePrice,
+  productPageEvidence,
+  resultMatchesAlbum,
+  scanAlbum
+};

@@ -1,0 +1,20 @@
+{
+  "automationEnabled": true,
+  "webAccessEnabled": true,
+  "allowLanAccess": false,
+  "scanIntervalMs": 1800000,
+  "syncIntervalMs": 600000,
+  "scanLimit": 25,
+  "dailyScanLimit": 500,
+  "searchProvider": "duckduckgo",
+  "searxngUrl": "",
+  "searchResultLimit": 20,
+  "maxListingsPerAlbum": 12,
+  "currency": "USD",
+  "exchangeRatesToAud": {
+    "AUD": 1,
+    "USD": 1.52,
+    "EUR": 1.65,
+    "GBP": 1.95
+  }
+}
