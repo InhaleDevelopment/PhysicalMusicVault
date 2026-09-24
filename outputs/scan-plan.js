@@ -1,5 +1,5 @@
 const fs = require("fs");
-const { albumPriority, compareScanPriority, isSearchEligible } = require("./catalog-model");
+const { albumPriority, compareScanPriority, isSearchEligible, normaliseFormat } = require("./catalog-model");
 const { atomicWriteJson } = require("./vault-platform");
 
 const TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
@@ -40,7 +40,9 @@ function createDailyPlan(vault, requestedLimit = DEFAULT_DAILY_LIMIT, previousPl
   const timeZone = validTimeZone(options.timeZone || previousPlan?.timeZone || TIME_ZONE);
   const today = dayKey(now, timeZone);
   const sameDayPlan = previousPlan?.day === today ? previousPlan : null;
-  const previousById = new Map((sameDayPlan?.albums || []).map(item => [item.id, item]));
+  const format = normaliseFormat(options.searchFormat || previousPlan?.searchFormat || "cd");
+  const sameFormatPlan = sameDayPlan && normaliseFormat(sameDayPlan.searchFormat || "cd") === format ? sameDayPlan : null;
+  const previousById = new Map((sameFormatPlan?.albums || []).map(item => [item.id, item]));
   const eligible = eligibleAlbums(vault);
   const selected = eligible.slice().sort(compareScanPriority).slice(0, limit);
 
@@ -63,6 +65,7 @@ function createDailyPlan(vault, requestedLimit = DEFAULT_DAILY_LIMIT, previousPl
     schemaVersion: 1,
     day: today,
     timeZone,
+    searchFormat: format,
     dailyLimit: limit,
     selectedAt: now.toISOString(),
     requestCount: Math.max(0, Number(sameDayPlan?.requestCount || 0)),
@@ -75,8 +78,9 @@ function createDailyPlan(vault, requestedLimit = DEFAULT_DAILY_LIMIT, previousPl
 function ensureDailyPlan(vault, requestedLimit, previousPlan, now = new Date(), options = {}) {
   const timeZone = validTimeZone(options.timeZone || previousPlan?.timeZone || TIME_ZONE);
   const today = dayKey(now, timeZone);
-  if (previousPlan?.day === today && previousPlan?.timeZone === timeZone && Array.isArray(previousPlan.albums)) return previousPlan;
-  return createDailyPlan(vault, requestedLimit, null, now, { ...options, timeZone });
+  const format = normaliseFormat(options.searchFormat || previousPlan?.searchFormat || "cd");
+  if (previousPlan?.day === today && previousPlan?.timeZone === timeZone && normaliseFormat(previousPlan.searchFormat || "cd") === format && Array.isArray(previousPlan.albums)) return previousPlan;
+  return createDailyPlan(vault, requestedLimit, previousPlan, now, { ...options, timeZone, searchFormat: format });
 }
 
 function planSummary(plan) {
@@ -88,6 +92,7 @@ function planSummary(plan) {
   return {
     day: plan?.day || dayKey(new Date(), plan?.timeZone || TIME_ZONE),
     timeZone: plan?.timeZone || TIME_ZONE,
+    searchFormat: normaliseFormat(plan?.searchFormat || "cd"),
     dailyLimit,
     selected: albums.length,
     priorityFiveSelected: albums.filter(item => Number(item.priority) === 5).length,

@@ -55,9 +55,20 @@ test("album artwork uses stable square containers without distortion", () => {
 
 test("collection is an interactive shelf with centred detail controls", () => {
   assert.match(html, /class="shelf-album"/);
+  assert.match(html, /class="shelf-row/);
   assert.match(html, /data-album-tile=/);
   assert.match(html, /class="album-detail-layout"/);
-  assert.match(html, /data-editor-group="format"/);
+  assert.match(css, /url\("assets\/music-shelf\.png"\)/);
+  assert.match(css, /\.shelf-peek/);
+  assert.doesNotMatch(html, /id="formatFilter"/);
+  assert.doesNotMatch(html, /data-editor-group="format"/);
+});
+
+test("physical format is selected when a search starts", () => {
+  for (const format of ["cd", "vinyl", "cassette"]) assert.match(html, new RegExp(`data-scan-format="${format}"`));
+  assert.match(html, /Artist - Album cd buy/);
+  assert.match(html, /cassette OR tape/);
+  assert.match(html, /\/api\/scan\?limit=25&format=/);
 });
 
 test("dashboard exposes market and delivered-cost controls", () => {

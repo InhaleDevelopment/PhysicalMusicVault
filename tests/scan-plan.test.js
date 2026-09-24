@@ -45,3 +45,15 @@ test("daily boundaries use the configured device timezone", () => {
   assert.equal(sydney.day, "2026-09-25");
   assert.equal(london.day, "2026-09-24");
 });
+
+test("switching physical format prepares new searches without resetting daily usage", () => {
+  const vault = { albums: [album("one", 5), album("two", 3)] };
+  const now = new Date("2026-09-24T00:00:00Z");
+  const cdPlan = createDailyPlan(vault, 500, null, now, { searchFormat: "cd" });
+  cdPlan.requestCount = 12;
+  cdPlan.albums[0].status = "completed";
+  const vinylPlan = createDailyPlan(vault, 500, cdPlan, now, { searchFormat: "vinyl" });
+  assert.equal(vinylPlan.searchFormat, "vinyl");
+  assert.equal(vinylPlan.requestCount, 12);
+  assert.deepEqual(vinylPlan.albums.map(item => item.status), ["pending", "pending"]);
+});

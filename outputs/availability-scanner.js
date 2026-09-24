@@ -11,7 +11,7 @@ const {
   recordResult,
   savePlan
 } = require("./scan-plan");
-const { convertCurrency, isKnownDigitalOnlyUrl, normaliseAlbum, normaliseCurrency } = require("./catalog-model");
+const { convertCurrency, isKnownDigitalOnlyUrl, normaliseAlbum, normaliseCurrency, normaliseFormat } = require("./catalog-model");
 const { searchWeb } = require("./web-search");
 const { atomicWriteJson } = require("./vault-platform");
 
@@ -121,6 +121,7 @@ function loadSettings() {
     searxngUrl: "",
     searchResultLimit: 20,
     maxListingsPerAlbum: 12,
+    searchFormat: "cd",
     marketScope: "worldwide",
     marketCountry: "US",
     marketRegion: "north-america",
@@ -211,7 +212,9 @@ function marketPreference(settings = {}) {
 }
 
 function googleQuery(album, settings = {}) {
-  const base = `${cleanField(album.artist)} - ${cleanField(album.album)} buy`;
+  const format = normaliseFormat(settings.searchFormat || album.format || "cd");
+  const formatTerms = format === "cassette" ? "cassette OR tape" : format;
+  const base = `${cleanField(album.artist)} - ${cleanField(album.album)} ${formatTerms} buy`;
   const market = marketPreference(settings);
   if (market.scope === "country") return `${base} ${market.countryName}`;
   if (market.scope === "region") return `${base} ${market.regionName}`;
@@ -644,7 +647,7 @@ async function verifyCandidate(album, candidate, trustedVendors, discogs, settin
 }
 
 async function scanAlbum(album, trustedVendors, settings) {
-  album = normaliseAlbum(album);
+  album = normaliseAlbum({ ...album, format: normaliseFormat(settings.searchFormat || "cd") });
   const update = {
     id: album.id || makeId(album.artist, album.album),
     artist: cleanField(album.artist),
@@ -747,7 +750,11 @@ async function main() {
     console.log("Internet scanning is disabled for dashboard-only mode.");
     return;
   }
-  const settings = loadSettings();
+  const loadedSettings = loadSettings();
+  const settings = {
+    ...loadedSettings,
+    searchFormat: normaliseFormat(process.env.SCAN_FORMAT || loadedSettings.searchFormat || "cd")
+  };
   const vault = readJson(vaultPath, { albums: [] });
   const trustedVendors = loadTrustedVendors();
   let plan = ensureDailyPlan(vault, settings.dailyScanLimit, loadPlan(planPath), new Date(), { timeZone: settings.timeZone });
@@ -797,6 +804,7 @@ async function main() {
   const results = {
     scannedAt: new Date().toISOString(),
     provider: settings.searchProvider === "searxng" ? "Self-hosted SearXNG" : "DuckDuckGo keyless web search",
+    searchFormat: settings.searchFormat,
     rateLimited: updates.some(album => album.rateLimited === true),
     dailyPlan: summary,
     queue: {

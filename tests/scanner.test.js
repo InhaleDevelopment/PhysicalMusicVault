@@ -13,10 +13,12 @@ const {
 } = require("../outputs/availability-scanner");
 
 test("uses the exact required Google query", () => {
-  assert.equal(googleQuery({ artist: "Acherontas", album: "Ta Tvam Asi (Universal Omniscience)" }), "Acherontas - Ta Tvam Asi (Universal Omniscience) buy");
+  assert.equal(googleQuery({ artist: "Acherontas", album: "Ta Tvam Asi (Universal Omniscience)" }), "Acherontas - Ta Tvam Asi (Universal Omniscience) cd buy");
+  assert.equal(googleQuery({ artist: "Acherontas", album: "Ta Tvam Asi" }, { searchFormat: "vinyl" }), "Acherontas - Ta Tvam Asi vinyl buy");
+  assert.equal(googleQuery({ artist: "Acherontas", album: "Ta Tvam Asi" }, { searchFormat: "cassette" }), "Acherontas - Ta Tvam Asi cassette OR tape buy");
   assert.equal(
-    googleQuery({ artist: "Acherontas", album: "Ta Tvam Asi" }, { marketScope: "country", marketCountry: "AU" }),
-    "Acherontas - Ta Tvam Asi buy Australia"
+    googleQuery({ artist: "Acherontas", album: "Ta Tvam Asi" }, { searchFormat: "cd", marketScope: "country", marketCountry: "AU" }),
+    "Acherontas - Ta Tvam Asi cd buy Australia"
   );
 });
 

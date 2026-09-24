@@ -722,7 +722,7 @@
             <h2>Your collection</h2>
             <p class="subtle">Choose what to search, what you already own, and how urgently you want each release.</p>
           </div>
-          <button id="collectionScanButton" class="primary" type="button">Scan selected albums</button>
+          <button id="collectionScanButton" class="primary" type="button">Search wanted albums</button>
         </div>
         <div class="toolbar">
           <input id="searchBox" type="search" placeholder="Search album, artist, year or genre" aria-label="Search collection">
@@ -732,12 +732,6 @@
             <option value="available">Available</option>
             <option value="owned">Owned</option>
             <option value="excluded">Not Interested</option>
-          </select>
-          <select id="formatFilter" aria-label="Format filter">
-            <option value="all">All formats</option>
-            <option value="cd">CD</option>
-            <option value="vinyl">Vinyl</option>
-            <option value="cassette">Cassette</option>
           </select>
           <select id="sortSelect" aria-label="Sort albums">
             <option value="added">Newest added</option>
@@ -938,15 +932,6 @@
               <button type="button" data-value="excluded">Not Interested</button>
             </div>
           </fieldset>
-          <fieldset class="choice-group">
-            <legend>Physical format</legend>
-            <input id="editFormat" type="hidden" value="cd">
-            <div class="segment-control" data-editor-group="format">
-              <button type="button" data-value="cd">CD</button>
-              <button type="button" data-value="vinyl">Vinyl</button>
-              <button type="button" data-value="cassette">Cassette</button>
-            </div>
-          </fieldset>
           <div class="form-grid detail-controls">
             <label>Priority
               <select id="editPriority">
@@ -983,6 +968,38 @@
     </form>
   </dialog>
 
+  <dialog id="scanDialog" class="scan-dialog">
+    <form method="dialog" class="dialog-inner scan-launcher" id="scanForm">
+      <div class="dialog-head">
+        <div>
+          <span class="eyebrow">Physical search</span>
+          <h2>Choose a format</h2>
+        </div>
+        <button class="icon" value="cancel" type="submit" formnovalidate aria-label="Close search" title="Close">&times;</button>
+      </div>
+      <input id="scanFormat" type="hidden" value="cd">
+      <div class="media-picker" aria-label="Physical format" role="group">
+        <button type="button" data-scan-format="cd">
+          <span class="media-symbol media-symbol-cd" aria-hidden="true"></span>
+          <strong>CD</strong>
+        </button>
+        <button type="button" data-scan-format="vinyl">
+          <span class="media-symbol media-symbol-vinyl" aria-hidden="true"></span>
+          <strong>Vinyl</strong>
+        </button>
+        <button type="button" data-scan-format="cassette">
+          <span class="media-symbol media-symbol-cassette" aria-hidden="true"></span>
+          <strong>Cassette</strong>
+        </button>
+      </div>
+      <div class="query-preview"><span>Search pattern</span><code id="scanQueryPreview">Artist - Album cd buy</code></div>
+      <div class="row scan-actions">
+        <button value="cancel" type="submit" formnovalidate>Cancel</button>
+        <button id="startScanButton" class="primary grow" value="default" type="submit">Search next 25</button>
+      </div>
+    </form>
+  </dialog>
+
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script>
@@ -998,7 +1015,7 @@
       albums: loadVault(),
       query: "",
       status: "all",
-      format: "all",
+      scanFormat: "cd",
       sort: "added",
       view: "home",
       dailyPlanVisibleCount: 25,
@@ -1058,7 +1075,6 @@
       loadMoreAlbumsButton: document.getElementById("loadMoreAlbumsButton"),
       searchBox: document.getElementById("searchBox"),
       statusFilter: document.getElementById("statusFilter"),
-      formatFilter: document.getElementById("formatFilter"),
       sortSelect: document.getElementById("sortSelect"),
       albumGrid: document.getElementById("albumGrid"),
       syncStatus: document.getElementById("syncStatus"),
@@ -1081,14 +1097,18 @@
       editGenre: document.getElementById("editGenre"),
       editStatus: document.getElementById("editStatus"),
       editPriority: document.getElementById("editPriority"),
-      editFormat: document.getElementById("editFormat"),
       editCurrentCost: document.getElementById("editCurrentCost"),
       editMinPrice: document.getElementById("editMinPrice"),
       editMaxPrice: document.getElementById("editMaxPrice"),
       editBudgetCurrency: document.getElementById("editBudgetCurrency"),
       editPurchaseUrl: document.getElementById("editPurchaseUrl"),
       editNotes: document.getElementById("editNotes"),
-      deleteAlbumButton: document.getElementById("deleteAlbumButton")
+      deleteAlbumButton: document.getElementById("deleteAlbumButton"),
+      scanDialog: document.getElementById("scanDialog"),
+      scanForm: document.getElementById("scanForm"),
+      scanFormat: document.getElementById("scanFormat"),
+      scanQueryPreview: document.getElementById("scanQueryPreview"),
+      startScanButton: document.getElementById("startScanButton")
     };
 
     function loadVault() {
@@ -1372,8 +1392,7 @@
         .filter(album => {
           const haystack = `${album.album} ${album.artist} ${album.genre} ${album.year}`.toLowerCase();
           return (!q || haystack.includes(q)) &&
-            (state.status === "all" || (state.status === "available" ? isAvailableCd(album) : albumStatus(album) === state.status)) &&
-            (state.format === "all" || album.format === state.format);
+            (state.status === "all" || (state.status === "available" ? isAvailableCd(album) : albumStatus(album) === state.status));
         })
         .sort((a, b) => {
           if (state.sort === "album") return a.album.localeCompare(b.album);
@@ -1385,7 +1404,9 @@
     }
 
     function purchaseLinks(album) {
-      const googleQuery = encodeURIComponent(`${album.artist} - ${album.album} buy`);
+      const format = ["cd", "vinyl", "cassette"].includes(state.scanFormat) ? state.scanFormat : "cd";
+      const terms = format === "cassette" ? "cassette OR tape" : format;
+      const googleQuery = encodeURIComponent(`${album.artist} - ${album.album} ${terms} buy`);
       return [
         ["Google", `https://www.google.com/search?q=${googleQuery}`]
       ];
@@ -1747,6 +1768,31 @@
         </div>`;
     }
 
+    function shelfColumnCount() {
+      if (window.innerWidth <= 520) return 2;
+      if (window.innerWidth <= 860) return 4;
+      if (window.innerWidth <= 1180) return 6;
+      return 8;
+    }
+
+    function shelfTile(album) {
+      const listings = getVerifiedListings(album);
+      const currentStatus = albumStatus(album);
+      const label = `${album.album} by ${album.artist}. ${statusLabel(currentStatus)}, priority ${albumPriority(album)}${listings.length ? `, ${listings.length} live listing${listings.length === 1 ? "" : "s"}` : ""}. Open details.`;
+      return `
+        <article class="shelf-slot">
+          <button class="shelf-album" type="button" data-action="edit" data-id="${escapeAttribute(album.id)}" data-album-tile="${escapeAttribute(album.id)}" aria-label="${escapeAttribute(label)}" title="${escapeAttribute(album.album)} · ${escapeAttribute(album.artist)}">
+            <div class="shelf-cover-frame">
+              ${artworkMarkup(album)}
+              <span class="shelf-status ${escapeHtml(currentStatus)}" aria-label="${escapeAttribute(statusLabel(currentStatus))}"></span>
+              <span class="shelf-priority" aria-label="Priority ${escapeAttribute(String(albumPriority(album)))}">${escapeHtml(String(albumPriority(album)))}</span>
+              ${listings.length ? `<span class="shelf-live" aria-label="${listings.length} live listings">${listings.length}</span>` : ""}
+              <span class="shelf-peek" aria-hidden="true"><strong>${escapeHtml(album.album)}</strong><span>${escapeHtml(album.artist)}</span></span>
+            </div>
+          </button>
+        </article>`;
+    }
+
     function render() {
       const filteredAlbums = getFilteredAlbums();
       const albums = filteredAlbums.slice(0, state.libraryVisibleCount);
@@ -1777,31 +1823,13 @@
         return;
       }
 
-      els.albumGrid.innerHTML = albums.map(album => {
-        const listings = getVerifiedListings(album);
-        const primaryListing = listings[0];
-        const deliveredPrice = primaryListing ? formatDeliveredPrice(primaryListing) : "";
-        const currentStatus = albumStatus(album);
-        const added = album.dateAdded ? new Date(album.dateAdded) : null;
-        const addedLabel = added && Number.isFinite(added.getTime()) ? added.toLocaleDateString(undefined, { month: "short", year: "numeric" }) : "In collection";
-        return `
-        <article class="shelf-slot">
-          <button class="shelf-album" type="button" data-action="edit" data-id="${escapeAttribute(album.id)}" data-album-tile="${escapeAttribute(album.id)}" title="Open ${escapeAttribute(album.album)} by ${escapeAttribute(album.artist)}">
-            <div class="shelf-cover-frame">
-              ${artworkMarkup(album)}
-              <span class="shelf-status ${escapeHtml(currentStatus)}" aria-label="${escapeAttribute(statusLabel(currentStatus))}"></span>
-              <span class="shelf-priority" aria-label="Priority ${escapeAttribute(String(albumPriority(album)))}">${escapeHtml(String(albumPriority(album)))}</span>
-              ${listings.length ? `<span class="shelf-live">${listings.length} live</span>` : ""}
-            </div>
-            <span class="shelf-caption">
-              <strong>${escapeHtml(album.album)}</strong>
-              <span>${escapeHtml(album.artist)}</span>
-              <small>${escapeHtml((album.format || "cd").toUpperCase())}${deliveredPrice ? ` · ${escapeHtml(deliveredPrice)} delivered` : ` · ${escapeHtml(addedLabel)}`}</small>
-            </span>
-          </button>
-        </article>
-      `;
-      }).join("");
+      const columns = shelfColumnCount();
+      const rows = [];
+      for (let index = 0; index < albums.length; index += columns) rows.push(albums.slice(index, index + columns));
+      els.albumGrid.innerHTML = rows.map((row, index) => `
+        <div class="shelf-row shelf-row-${index % 4}" style="--shelf-columns:${columns}" role="list">
+          <div class="shelf-covers">${row.map(shelfTile).join("")}</div>
+        </div>`).join("");
     }
 
     function renderNotices() {
@@ -2033,6 +2061,7 @@
       els.marketRegion.value = settings.marketRegion || "north-america";
       els.marketCountry.disabled = els.marketScope.value === "region";
       els.marketRegion.disabled = els.marketScope.value !== "region";
+      if (!els.scanDialog.open) state.scanFormat = normaliseScanFormat(settings.searchFormat || state.scanFormat);
       els.timeZoneValue.textContent = settings.timeZone || deviceTimeZone();
       const folderName = settings.libraryFolderName || "Music";
       els.libraryFolderStatus.textContent = settings.libraryFolderAvailable
@@ -2077,7 +2106,7 @@
       els.settingsStatus.innerHTML = `
         <strong>Automation</strong>
         <span class="${settings.automationEnabled === false || scanner.rateLimited ? "health-warn" : "health-ok"}">${settings.automationEnabled === false ? "Paused" : scanner.rateLimited ? "Cooling down" : "Active"}</span>
-        <p class="subtle">${escapeHtml(scanner.provider || (settings.searchProvider === "searxng" ? "Self-hosted SearXNG" : "DuckDuckGo keyless web search"))} runs Artist - Album buy every ${escapeHtml(formatInterval(settings.scanIntervalMs || scanner.intervalMs))}, checking ${escapeHtml(String(settings.scanLimit || scanner.limit || 25))} selected albums at a time. The daily maximum is ${escapeHtml(String(settings.dailyScanLimit || scanner.dailyLimit || 500))} in ${escapeHtml(settings.timeZone || deviceTimeZone())}. Currency reference rates were updated ${escapeHtml(settings.exchangeRatesUpdatedAt ? new Date(settings.exchangeRatesUpdatedAt).toLocaleString() : "using bundled fallback rates")}.</p>
+        <p class="subtle">${escapeHtml(scanner.provider || (settings.searchProvider === "searxng" ? "Self-hosted SearXNG" : "DuckDuckGo keyless web search"))} runs the selected ${escapeHtml(String(settings.searchFormat || "cd").toUpperCase())} search every ${escapeHtml(formatInterval(settings.scanIntervalMs || scanner.intervalMs))}, checking ${escapeHtml(String(settings.scanLimit || scanner.limit || 25))} albums at a time. The daily maximum is ${escapeHtml(String(settings.dailyScanLimit || scanner.dailyLimit || 500))} in ${escapeHtml(settings.timeZone || deviceTimeZone())}. Currency reference rates were updated ${escapeHtml(settings.exchangeRatesUpdatedAt ? new Date(settings.exchangeRatesUpdatedAt).toLocaleString() : "using bundled fallback rates")}.</p>
         <p class="subtle">${settings.allowLanAccess === true ? `Private-network access is enabled. Restart the vault after a change. ${(state.vaultMeta?.systemHealth?.server?.localNetworkUrls || []).map(url => escapeHtml(url)).join(" ")}` : "Private-network access is off. The dashboard is only reachable from this PC."}</p>
       `;
       els.trustedVendorsList.innerHTML = trusted.length
@@ -2123,7 +2152,33 @@
 
     window._oldvault = _oldvault;
 
-    async function refreshAvailability() {
+    function normaliseScanFormat(value) {
+      return ["cd", "vinyl", "cassette"].includes(value) ? value : "cd";
+    }
+
+    function setScanFormat(value) {
+      const format = normaliseScanFormat(value);
+      const terms = format === "cassette" ? "cassette OR tape" : format;
+      state.scanFormat = format;
+      els.scanFormat.value = format;
+      els.scanQueryPreview.textContent = `Artist - Album ${terms} buy`;
+      els.scanDialog.querySelectorAll("[data-scan-format]").forEach(button => {
+        const selected = button.dataset.scanFormat === format;
+        button.classList.toggle("selected", selected);
+        button.setAttribute("aria-pressed", String(selected));
+      });
+    }
+
+    function openScanLauncher() {
+      const scanner = state.vaultMeta?.systemHealth?.availabilityScanner || state.vaultMeta?.scannerStatus || {};
+      setScanFormat(state.vaultMeta?.settings?.searchFormat || state.scanFormat || "cd");
+      els.startScanButton.disabled = scanner.running === true;
+      els.startScanButton.textContent = scanner.running ? "Scan in progress" : "Search next 25";
+      els.scanDialog.showModal();
+    }
+
+    async function refreshAvailability(requestedFormat = null) {
+      const selectedFormat = normaliseScanFormat(requestedFormat || state.vaultMeta?.settings?.searchFormat || state.scanFormat);
       if (!state.serverMode) {
         state.albums = state.albums.map(album => ({ ...album, lastChecked: new Date().toISOString() }));
         saveVault();
@@ -2139,17 +2194,19 @@
       }
       showToast("Starting the next priority scan...");
       try {
-        const response = await fetch("/api/scan?limit=25", { method: "POST" });
+        const response = await fetch(`/api/scan?limit=25&format=${encodeURIComponent(selectedFormat)}`, { method: "POST" });
         const result = await response.json();
         if (!response.ok || (!result.ok && !result.skipped)) throw new Error(result.error || result.message || "Scan failed");
         if (result.started) {
+          state.scanFormat = selectedFormat;
           state.vaultMeta = {
             ...(state.vaultMeta || {}),
+            settings: { ...(state.vaultMeta?.settings || {}), searchFormat: selectedFormat },
             scannerStatus: { ...(state.vaultMeta?.scannerStatus || {}), running: true, message: result.message, progress: result.progress }
           };
           render();
           pollActiveScan();
-          showToast("Scan started. Verified matches will appear while it runs.");
+          showToast(`${selectedFormat === "vinyl" ? "Vinyl" : selectedFormat === "cassette" ? "Cassette" : "CD"} scan started. Verified matches will appear while it runs.`);
         } else {
           showToast(result.message || "Nothing is waiting to be scanned.");
           await loadVaultFromServer();
@@ -2173,10 +2230,9 @@
       }, 3000);
     }
 
-    function setEditorChoice(group, value) {
-      const input = group === "status" ? els.editStatus : els.editFormat;
-      input.value = value;
-      els.dialog.querySelectorAll(`[data-editor-group="${group}"] button`).forEach(button => {
+    function setEditorChoice(value) {
+      els.editStatus.value = value;
+      els.dialog.querySelectorAll('[data-editor-group="status"] button').forEach(button => {
         const selected = button.dataset.value === value;
         button.classList.toggle("selected", selected);
         button.setAttribute("aria-pressed", String(selected));
@@ -2209,15 +2265,14 @@
         trigger
       };
       els.dialogTitle.textContent = album ? "Edit Album" : "Add Album";
-      els.dialogEyebrow.textContent = album ? `${String(album.format || "cd").toUpperCase()} · Priority ${albumPriority(album)}` : "New collection record";
+      els.dialogEyebrow.textContent = album ? `Priority ${albumPriority(album)} · ${statusLabel(albumStatus(album))}` : "New collection record";
       els.editId.value = album?.id || "";
       els.editAlbum.value = album?.album || "";
       els.editArtist.value = album?.artist || "";
       els.editYear.value = album?.year || "";
       els.editGenre.value = album?.genre || "";
-      setEditorChoice("status", album ? albumStatus(album) : "wanted");
+      setEditorChoice(album ? albumStatus(album) : "wanted");
       els.editPriority.value = String(album ? albumPriority(album) : 3);
-      setEditorChoice("format", ["cd", "vinyl", "cassette"].includes(album?.format) ? album.format : "cd");
       els.editCurrentCost.value = album?.currentCost || album?.price || "";
       els.editMinPrice.value = album?.minPrice || album?.priceMin || "";
       els.editMaxPrice.value = album?.maxPrice || album?.priceMax || album?.targetPrice || "";
@@ -2243,7 +2298,6 @@
         genre: clean(els.editGenre.value),
         status: els.editStatus.value,
         priority: Number(els.editPriority.value),
-        format: els.editFormat.value,
         currentCost: clean(els.editCurrentCost.value),
         minPrice: clean(els.editMinPrice.value),
         maxPrice: clean(els.editMaxPrice.value),
@@ -2557,7 +2611,7 @@
     els.saveMarketSettingsButton.addEventListener("click", saveSearchSettings);
     els.saveLibraryFolderButton.addEventListener("click", saveLibraryFolder);
     els.selectDailyScanButton.addEventListener("click", () => selectDailyScanPlan(false));
-    els.scanSelectedBatchButton.addEventListener("click", refreshAvailability);
+    els.scanSelectedBatchButton.addEventListener("click", openScanLauncher);
     els.dailyScanSelection.addEventListener("click", event => {
       if (event.target.id !== "showMoreDailyPlan") return;
       state.dailyPlanVisibleCount += 25;
@@ -2565,10 +2619,9 @@
     });
     els.searchBox.addEventListener("input", event => { state.query = event.target.value; state.libraryVisibleCount = 60; render(); });
     els.statusFilter.addEventListener("change", event => { state.status = event.target.value; state.libraryVisibleCount = 60; render(); });
-    els.formatFilter.addEventListener("change", event => { state.format = event.target.value; state.libraryVisibleCount = 60; render(); });
     els.sortSelect.addEventListener("change", event => { state.sort = event.target.value; state.libraryVisibleCount = 60; render(); });
     els.loadMoreAlbumsButton.addEventListener("click", () => { state.libraryVisibleCount += 60; render(); });
-    els.collectionScanButton.addEventListener("click", refreshAvailability);
+    els.collectionScanButton.addEventListener("click", openScanLauncher);
     els.noticeBoard.addEventListener("click", event => {
       const target = event.target.closest("[data-view-target]");
       if (!target) return;
@@ -2578,7 +2631,7 @@
     els.scanPulse.addEventListener("click", event => {
       const action = event.target.closest("[data-pulse-action]")?.dataset.pulseAction;
       if (action === "collection") setView("search");
-      if (action === "scan") refreshAvailability();
+      if (action === "scan") openScanLauncher();
     });
 
     document.addEventListener("error", event => {
@@ -2648,8 +2701,7 @@
     els.dialog.addEventListener("click", event => {
       const choice = event.target.closest("[data-editor-group] button[data-value]");
       if (choice) {
-        const group = choice.closest("[data-editor-group]").dataset.editorGroup;
-        setEditorChoice(group, choice.dataset.value);
+        setEditorChoice(choice.dataset.value);
         return;
       }
       if (event.target === els.dialog) els.dialog.close();
@@ -2666,6 +2718,34 @@
         tile?.focus({ preventScroll: true });
         state.dialogReturn = null;
       });
+    });
+
+    els.scanDialog.addEventListener("click", event => {
+      const choice = event.target.closest("[data-scan-format]");
+      if (choice) {
+        setScanFormat(choice.dataset.scanFormat);
+        return;
+      }
+      if (event.target === els.scanDialog) els.scanDialog.close();
+    });
+
+    els.scanForm.addEventListener("submit", event => {
+      event.preventDefault();
+      if (event.submitter?.value === "cancel") {
+        els.scanDialog.close();
+        return;
+      }
+      const format = normaliseScanFormat(els.scanFormat.value);
+      els.scanDialog.close();
+      refreshAvailability(format);
+    });
+
+    let lastShelfColumns = shelfColumnCount();
+    window.addEventListener("resize", () => {
+      const columns = shelfColumnCount();
+      if (columns === lastShelfColumns) return;
+      lastShelfColumns = columns;
+      render();
     });
 
     render();

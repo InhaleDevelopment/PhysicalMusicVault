@@ -15,13 +15,13 @@ Physical Music Vault is intentionally local-first and dependency-light. A Node.j
 | `vault-platform.js` | Atomic persistence, settings allowlist, artwork safety, and API response sanitisation |
 | `vault-agent.js` | Background server supervision and local health reporting |
 | `vault-toggle.js` | One-command Windows on/off lifecycle |
-| `physical-music-vault.html` + `vault.css` | Install-free browser application and responsive design system |
+| `physical-music-vault.html` + `vault.css` + `assets/music-shelf.png` | Install-free browser application, responsive shelf interaction, and visual system |
 
 ## Data Flow
 
 1. The sync worker reads the configured media folder and writes a temporary snapshot.
 2. The server merges that snapshot into the latest vault so status, priority, budgets, and live scan results cannot be overwritten by a concurrent sync.
-3. The daily planner selects only present Wanted albums, ordered by priority and least-recent scan.
+3. The daily planner selects only present Wanted albums, ordered by priority and least-recent scan. It records the active CD, vinyl, or cassette search while preserving daily request accounting when that format changes.
 4. The scanner emits an IPC result after every album. The server atomically merges it immediately, so the dashboard updates during a batch rather than after it.
 5. The public API strips local paths. Artwork is served only by album ID after validating that the resolved image remains inside that album's source folder.
 

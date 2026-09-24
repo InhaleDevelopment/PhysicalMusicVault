@@ -43,7 +43,8 @@ test("settings updates are allowlisted and bounded", () => {
     timeZone: "Australia/Sydney",
     marketScope: "region",
     marketCountry: "au",
-    marketRegion: "oceania"
+    marketRegion: "oceania",
+    searchFormat: "vinyl"
   });
 
   assert.deepEqual(update, {
@@ -54,7 +55,8 @@ test("settings updates are allowlisted and bounded", () => {
     timeZone: "Australia/Sydney",
     marketScope: "region",
     marketCountry: "AU",
-    marketRegion: "oceania"
+    marketRegion: "oceania",
+    searchFormat: "vinyl"
   });
 });
 

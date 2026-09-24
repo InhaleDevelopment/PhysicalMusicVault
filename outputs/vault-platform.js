@@ -17,7 +17,24 @@ const IMAGE_TYPES = new Map([
 function atomicWriteJson(filePath, value) {
   const temporaryPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
   fs.writeFileSync(temporaryPath, JSON.stringify(value, null, 2), "utf8");
-  fs.renameSync(temporaryPath, filePath);
+  let lastError;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    try {
+      fs.renameSync(temporaryPath, filePath);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (!["EACCES", "EBUSY", "EPERM"].includes(error.code)) break;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25 * (attempt + 1));
+    }
+  }
+  try {
+    fs.copyFileSync(temporaryPath, filePath);
+    fs.unlinkSync(temporaryPath);
+  } catch {
+    try { fs.unlinkSync(temporaryPath); } catch {}
+    throw lastError;
+  }
 }
 
 function albumArtworkUrl(album) {
@@ -87,6 +104,9 @@ function normaliseSettingsUpdate(payload = {}) {
 
   if (["duckduckgo", "searxng"].includes(payload.searchProvider)) {
     next.searchProvider = payload.searchProvider;
+  }
+  if (["cd", "vinyl", "cassette"].includes(payload.searchFormat)) {
+    next.searchFormat = payload.searchFormat;
   }
   if (typeof payload.searxngUrl === "string") {
     const url = payload.searxngUrl.trim().slice(0, 500);

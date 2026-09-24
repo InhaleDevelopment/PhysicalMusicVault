@@ -1,5 +1,18 @@
 # Changelog
 
+## 3.3.0 - 2026-09-24
+
+### Added
+
+- A tactile, image-backed music cabinet with responsive shelf rows and cover-forward interaction.
+- A focused search launcher for CD, vinyl, or cassette with the exact query pattern visible before scanning.
+
+### Changed
+
+- Album and artist text now appears on shelf interaction rather than beneath every cover.
+- Physical format is a scan-session choice instead of a Collection filter or per-album field.
+- Switching search format prepares the new medium without resetting the daily request count.
+
 ## 3.2.0 - 2026-09-24
 
 ### Added

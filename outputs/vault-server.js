@@ -11,7 +11,7 @@ const {
   planSummary,
   savePlan
 } = require("./scan-plan");
-const { albumPriority, isKnownDigitalOnlyUrl, normaliseAlbum, normaliseStatus } = require("./catalog-model");
+const { albumPriority, isKnownDigitalOnlyUrl, normaliseAlbum, normaliseFormat, normaliseStatus } = require("./catalog-model");
 const { searchWeb } = require("./web-search");
 const {
   atomicWriteJson,
@@ -54,6 +54,7 @@ const defaultSettings = {
   scanLimit: 25,
   dailyScanLimit: DEFAULT_DAILY_LIMIT,
   searchProvider: "duckduckgo",
+  searchFormat: "cd",
   searxngUrl: "",
   searchResultLimit: 20,
   maxListingsPerAlbum: 12,
@@ -94,6 +95,7 @@ const types = {
   ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".css": "text/css; charset=utf-8",
+  ".png": "image/png",
   ".csv": "text/csv; charset=utf-8",
   ".md": "text/markdown; charset=utf-8"
 };
@@ -129,7 +131,8 @@ function publicFileFromUrl(url) {
   const publicFiles = new Map([
     ["/", indexPath],
     ["/physical-music-vault.html", indexPath],
-    ["/vault.css", path.join(root, "vault.css")]
+    ["/vault.css", path.join(root, "vault.css")],
+    ["/assets/music-shelf.png", path.join(root, "assets", "music-shelf.png")]
   ]);
   return publicFiles.get(pathname) || null;
 }
@@ -255,8 +258,8 @@ function localNetworkUrls() {
 function getDailyScanPlan(vault = readVault(), force = false) {
   const previous = loadPlan(scanPlanPath);
   const plan = force
-    ? createDailyPlan(vault, settings.dailyScanLimit, previous, new Date(), { retryFailed: true, timeZone: settings.timeZone })
-    : ensureDailyPlan(vault, settings.dailyScanLimit, previous, new Date(), { timeZone: settings.timeZone });
+    ? createDailyPlan(vault, settings.dailyScanLimit, previous, new Date(), { retryFailed: true, timeZone: settings.timeZone, searchFormat: settings.searchFormat })
+    : ensureDailyPlan(vault, settings.dailyScanLimit, previous, new Date(), { timeZone: settings.timeZone, searchFormat: settings.searchFormat });
   if (force || plan !== previous) savePlan(scanPlanPath, plan);
   return { ...plan, summary: planSummary(plan) };
 }
@@ -747,6 +750,7 @@ function mergeScanResults() {
 
 function startAvailabilityScan(limit = null, options = {}) {
   settings = loadSettings();
+  const selectedFormat = normaliseFormat(options.searchFormat || settings.searchFormat || "cd");
   const effectiveLimit = Math.max(1, Math.min(50, Number(limit || settings.scanLimit || scanLimit)));
   if (isOutboundWebDisabled()) {
     lastScannerMessage = "Internet scanning is disabled for dashboard-only mode.";
@@ -774,8 +778,8 @@ function startAvailabilityScan(limit = null, options = {}) {
   if (scannerRunning) return { ok: false, skipped: true, message: "Scanner already running" };
   scannerRunning = true;
   const startedAt = new Date().toISOString();
-  lastScannerMessage = "Scan started. Results will appear as each album is checked.";
-  scannerProgress = { startedAt, completed: 0, total: Math.min(effectiveLimit, plan.summary.pending), album: null };
+  lastScannerMessage = `${selectedFormat.toUpperCase()} scan started. Results will appear as each album is checked.`;
+  scannerProgress = { startedAt, completed: 0, total: Math.min(effectiveLimit, plan.summary.pending), album: null, searchFormat: selectedFormat };
 
   let completeScan;
   const completion = new Promise(resolve => { completeScan = resolve; });
@@ -784,6 +788,7 @@ function startAvailabilityScan(limit = null, options = {}) {
     env: {
       ...process.env,
       SCAN_LIMIT: String(effectiveLimit),
+      SCAN_FORMAT: selectedFormat,
       VAULT_DATA_DIR: dataRoot,
       VAULT_DISABLE_WEB: settings.webAccessEnabled === false ? "1" : "0"
     },
@@ -1194,7 +1199,9 @@ const server = http.createServer(async (req, res) => {
       }
       const requestUrl = new URL(req.url, "http://localhost");
       const limit = Number(requestUrl.searchParams.get("limit") || settings.scanLimit || 25);
-      const result = startAvailabilityScan(limit, { manual: true });
+      const searchFormat = normaliseFormat(requestUrl.searchParams.get("format") || settings.searchFormat || "cd");
+      saveSettings({ searchFormat });
+      const result = startAvailabilityScan(limit, { manual: true, searchFormat });
       const status = result.started ? 202 : result.skipped ? 200 : 500;
       send(res, status, JSON.stringify({
         ok: result.ok,

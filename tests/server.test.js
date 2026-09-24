@@ -60,6 +60,7 @@ test("local server protects private data and supports the core album journey", a
   const home = await fetch(`${base}/`);
   assert.equal(home.status, 200);
   assert.match(await home.text(), /Physical Music Vault/);
+  assert.equal((await fetch(`${base}/assets/music-shelf.png`)).status, 200);
   assert.equal((await fetch(`${base}/vault-data.json`)).status, 404);
 
   let response = await fetch(`${base}/api/vault`);
@@ -67,6 +68,7 @@ test("local server protects private data and supports the core album journey", a
   assert.equal(response.status, 200);
   assert.equal(JSON.stringify(vault).includes(dataRoot), false);
   assert.equal(vault.settings.automationEnabled, false);
+  assert.equal(vault.settings.searchFormat, "cd");
   assert.equal(vault.albums[0].artworkUrl, "/api/artwork/artist-album");
   assert.equal((await fetch(`${base}${vault.albums[0].artworkUrl}`)).status, 200);
 

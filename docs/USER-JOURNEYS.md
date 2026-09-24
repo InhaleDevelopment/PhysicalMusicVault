@@ -12,22 +12,23 @@ These are the release acceptance journeys for Physical Music Vault.
 ## Build The Watchlist
 
 1. The Collection view combines the configured folder, imported catalogues, and manual entries, with local cover artwork when available.
-2. The chronological artwork shelf and format/status filters narrow large libraries without rendering the whole catalogue at once.
+2. The chronological collection is presented as physical cover artwork placed on tactile shelf rows; search and status controls narrow large libraries without rendering the whole catalogue at once.
 3. Selecting a cover opens the album in the centre of the screen; closing it restores the exact shelf position.
 4. Wanted enters search selection; Owned and Not Interested stay out.
 5. Priority 1-5 controls queue order. Priority 5 is the highest.
-6. The album workspace sets CD, vinyl, or cassette plus minimum/maximum delivered price and AUD, USD, GBP, or EUR budget currency.
+6. The album workspace sets minimum/maximum delivered price and AUD, USD, GBP, or EUR budget currency.
 7. Changes update one album through the API and cannot overwrite a concurrent sync or scan.
 
 ## Find A Physical Release
 
-1. The user selects Today's 500 or clicks Scan selected albums.
-2. Up to 500 Wanted albums enter the local-day queue, priority 5 first.
-3. The next batch starts without holding the browser request open.
-4. The live banner shows the album currently being checked.
-5. Each verified seller result appears as soon as that album finishes.
-6. The seller link opens the final direct page, never a search redirect.
-7. Worldwide, country, or regional scope filters seller results using origin and delivery evidence.
+1. The user selects Today's 500 or clicks Search wanted albums.
+2. A focused launcher asks for CD, vinyl, or cassette and previews the exact query pattern.
+3. Up to 500 Wanted albums enter the local-day queue, priority 5 first; switching format prepares new pending searches without resetting requests already used that day.
+4. The next batch starts without holding the browser request open.
+5. The live banner shows the album currently being checked.
+6. Each verified seller result appears as soon as that album finishes.
+7. The seller link opens the final direct page, never a search redirect.
+8. Worldwide, country, or regional scope filters seller results using origin and delivery evidence.
 
 ## Assess Results
 

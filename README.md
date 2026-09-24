@@ -8,9 +8,9 @@ Version 3 is a dependency-light Node.js application with no account, cloud datab
 
 1. Watch any configured `<Artist>/<Album>` music folder for changes and reconcile it every 10 minutes, or import a CSV/JSON catalogue.
 2. Browse an artwork-first chronological shelf and open any cover into a focused album workspace.
-3. Keep catalogue status separate from a 1-5 purchase priority, CD/vinyl/cassette target, and per-album delivered-price range.
+3. Keep catalogue status separate from a 1-5 purchase priority and per-album delivered-price range.
 4. Select up to 500 Wanted albums per local calendar day, highest priority first.
-5. Search `Artist - Album buy`, optionally narrowed to a country or region, using a free keyless provider or self-hosted SearXNG.
+5. Choose CD, vinyl, or cassette when starting a search. The query becomes `Artist - Album cd buy`, `Artist - Album vinyl buy`, or `Artist - Album cassette OR tape buy`, optionally narrowed to a country or region.
 6. Cross-check the artist and release against Discogs across every genre.
 7. Accept a result only when the direct seller page proves the artist, album, selected format, numeric price, active purchase control, and any requested market restriction.
 8. Extract a seller shipping rate where published; otherwise show a format- and distance-based estimate and keep it visibly labelled.
@@ -26,10 +26,10 @@ Prices are converted among AUD, USD, GBP, and EUR using daily reference rates fr
 2. Double-click `outputs/Vault On-Off.cmd`.
 3. The first start installs the open-source parser dependency and opens `http://localhost:8787/`.
 4. In Settings, point **Synced source folder** to the folder containing `<Artist>/<Album>` directories, or import a CSV/JSON catalogue.
-5. Open an album cover, mark it Wanted, Owned, or Not Interested, then set priority, format, and delivered-price range.
+5. Open an album cover, mark it Wanted, Owned, or Not Interested, then set priority and delivered-price range.
 6. In Settings, choose Worldwide, Country, or Region results and the country used for delivery calculations.
 7. Enable **Automated availability scanning** when ready. The consent prompt explains that artist and album terms are sent to the selected search provider and matching seller pages are visited.
-8. Select **Today's 500**, then use **Scan Next 25** or leave 30-minute automation enabled.
+8. Select **Today's 500**, then choose CD, vinyl, or cassette when starting the next search. The latest choice also drives 30-minute automation.
 
 Double-click `Vault On-Off.cmd` again to stop the dashboard. The built-in provider needs no API key, account, card, or paid plan.
 
