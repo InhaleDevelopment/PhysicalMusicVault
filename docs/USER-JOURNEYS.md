@@ -12,11 +12,12 @@ These are the release acceptance journeys for Physical Music Vault.
 ## Build The Watchlist
 
 1. The Collection view combines the configured folder, imported catalogues, and manual entries, with local cover artwork when available.
-2. Search and format/status filters narrow large libraries without rendering the whole catalogue at once.
-3. Wanted enters search selection; Owned and Not Interested stay out.
-4. Priority 1-5 controls queue order. Priority 5 is the highest.
-5. The editor sets physical format, minimum/maximum price, and AUD, USD, GBP, or EUR budget currency.
-6. Changes update one album through the API and cannot overwrite a concurrent sync or scan.
+2. The chronological artwork shelf and format/status filters narrow large libraries without rendering the whole catalogue at once.
+3. Selecting a cover opens the album in the centre of the screen; closing it restores the exact shelf position.
+4. Wanted enters search selection; Owned and Not Interested stay out.
+5. Priority 1-5 controls queue order. Priority 5 is the highest.
+6. The album workspace sets CD, vinyl, or cassette plus minimum/maximum delivered price and AUD, USD, GBP, or EUR budget currency.
+7. Changes update one album through the API and cannot overwrite a concurrent sync or scan.
 
 ## Find A Physical Release
 
@@ -26,14 +27,16 @@ These are the release acceptance journeys for Physical Music Vault.
 4. The live banner shows the album currently being checked.
 5. Each verified seller result appears as soon as that album finishes.
 6. The seller link opens the final direct page, never a search redirect.
+7. Worldwide, country, or regional scope filters seller results using origin and delivery evidence.
 
 ## Assess Results
 
 1. Successful Matches Today shows newly discovered listings in local chronological order.
 2. Top 100 Available Albums shows one current listing per Wanted album, priority first and recency second.
 3. Priority 5 Matches remains visible while those listings continue to pass verification.
-4. Every row contains album, artist, priority, converted price, seller link, local timestamp, and identity sources.
+4. Every row contains album, artist, format, priority, converted item price, delivery, delivered total, seller link, local timestamp, and identity sources.
 5. In-range and out-of-range notices remain visually distinct.
+6. Site shipping rates, free delivery, and estimates are labelled distinctly; the seller's checkout remains final.
 
 ## Background Operation
 

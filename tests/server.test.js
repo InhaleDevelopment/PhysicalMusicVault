@@ -66,6 +66,7 @@ test("local server protects private data and supports the core album journey", a
   let vault = await response.json();
   assert.equal(response.status, 200);
   assert.equal(JSON.stringify(vault).includes(dataRoot), false);
+  assert.equal(vault.settings.automationEnabled, false);
   assert.equal(vault.albums[0].artworkUrl, "/api/artwork/artist-album");
   assert.equal((await fetch(`${base}${vault.albums[0].artworkUrl}`)).status, 200);
 

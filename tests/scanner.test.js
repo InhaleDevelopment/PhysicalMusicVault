@@ -2,15 +2,59 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   googleQuery,
+  deliveryEvidence,
   hasPhysicalFormat,
+  hasSelectedFormat,
   hasPurchaseAction,
   identityVerification,
   parsePrice,
+  marketEligibility,
   productPageEvidence
 } = require("../outputs/availability-scanner");
 
 test("uses the exact required Google query", () => {
   assert.equal(googleQuery({ artist: "Acherontas", album: "Ta Tvam Asi (Universal Omniscience)" }), "Acherontas - Ta Tvam Asi (Universal Omniscience) buy");
+  assert.equal(
+    googleQuery({ artist: "Acherontas", album: "Ta Tvam Asi" }, { marketScope: "country", marketCountry: "AU" }),
+    "Acherontas - Ta Tvam Asi buy Australia"
+  );
+});
+
+test("extracts website shipping rates and confirms the selected market", () => {
+  const html = `<script type="application/ld+json">${JSON.stringify({
+    "@type": "Product",
+    offers: {
+      shippingDetails: {
+        shippingRate: { value: 7.5, currency: "USD" },
+        shippingDestination: { addressCountry: "AU" }
+      }
+    }
+  })}</script><main>Ships to Australia</main>`;
+  const settings = {
+    marketScope: "country",
+    marketCountry: "AU",
+    marketRegion: "oceania",
+    currency: "AUD",
+    exchangeRatesToAud: { AUD: 1, USD: 1.5, GBP: 1.9, EUR: 1.6 }
+  };
+  const delivery = deliveryEvidence(html, "https://shop.example/item", { format: "cd", budgetCurrency: "AUD" }, settings);
+  assert.equal(delivery.amount, 7.5);
+  assert.equal(delivery.accuracy, "site-rate");
+  assert.equal(delivery.convertedPrices.AUD, 11.25);
+  assert.equal(marketEligibility(delivery, settings).accepted, true);
+});
+
+test("labels fallback delivery as an estimate", () => {
+  const settings = {
+    marketScope: "worldwide",
+    marketCountry: "AU",
+    marketRegion: "oceania",
+    exchangeRatesToAud: { AUD: 1, USD: 1.5, GBP: 1.9, EUR: 1.6 }
+  };
+  const delivery = deliveryEvidence("<main>No shipping quote until checkout</main>", "https://shop.co.uk/item", { format: "vinyl", budgetCurrency: "AUD" }, settings);
+  assert.equal(delivery.amount, 38);
+  assert.equal(delivery.currency, "AUD");
+  assert.equal(delivery.accuracy, "estimated");
 });
 
 test("requires a live purchase action", () => {
@@ -23,6 +67,8 @@ test("checks the selected physical format", () => {
   assert.equal(hasPhysicalFormat("Format: Compact Disc", "cd"), true);
   assert.equal(hasPhysicalFormat("Digital download only", "cd"), false);
   assert.equal(hasPhysicalFormat("Limited cassette edition", "cassette"), true);
+  assert.equal(hasSelectedFormat("<title>Album vinyl LP</title><main>Browse CDs</main>", "https://shop.example/album-lp", "cd"), false);
+  assert.equal(hasSelectedFormat("<title>Album digipak CD</title><main>Add to cart</main>", "https://shop.example/album-cd", "cd"), true);
 });
 
 test("parses seller currency and creates all display conversions", () => {

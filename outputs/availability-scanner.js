@@ -46,6 +46,29 @@ const blockedHosts = [
   "youtube."
 ];
 
+const MARKET_COUNTRIES = Object.freeze({
+  AU: { name: "Australia", region: "oceania", suffixes: [".com.au", ".au"] },
+  NZ: { name: "New Zealand", region: "oceania", suffixes: [".co.nz", ".nz"] },
+  US: { name: "United States", region: "north-america", suffixes: [".us"] },
+  CA: { name: "Canada", region: "north-america", suffixes: [".ca"] },
+  GB: { name: "United Kingdom", region: "europe", suffixes: [".co.uk", ".uk"] },
+  DE: { name: "Germany", region: "europe", suffixes: [".de"] },
+  FR: { name: "France", region: "europe", suffixes: [".fr"] },
+  NL: { name: "Netherlands", region: "europe", suffixes: [".nl"] },
+  IT: { name: "Italy", region: "europe", suffixes: [".it"] },
+  ES: { name: "Spain", region: "europe", suffixes: [".es"] },
+  JP: { name: "Japan", region: "asia", suffixes: [".co.jp", ".jp"] }
+});
+
+const MARKET_REGIONS = Object.freeze({
+  oceania: "Oceania",
+  "north-america": "North America",
+  "south-america": "South America",
+  europe: "Europe",
+  asia: "Asia",
+  africa: "Africa"
+});
+
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -98,6 +121,9 @@ function loadSettings() {
     searxngUrl: "",
     searchResultLimit: 20,
     maxListingsPerAlbum: 12,
+    marketScope: "worldwide",
+    marketCountry: "US",
+    marketRegion: "north-america",
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
     dailyScanLimit: DEFAULT_DAILY_LIMIT,
     exchangeRatesToAud: { AUD: 1, USD: 1.52, EUR: 1.65, GBP: 1.95 },
@@ -171,12 +197,52 @@ function hasAlbumIdentity(text, album) {
   return matchedTokens >= Math.max(2, Math.ceil(titleTokens.length * 0.8));
 }
 
-function googleQuery(album) {
-  return `${cleanField(album.artist)} - ${cleanField(album.album)} buy`;
+function marketPreference(settings = {}) {
+  const scope = ["country", "region"].includes(settings.marketScope) ? settings.marketScope : "worldwide";
+  const country = MARKET_COUNTRIES[String(settings.marketCountry || "US").toUpperCase()] ? String(settings.marketCountry || "US").toUpperCase() : "US";
+  const region = MARKET_REGIONS[settings.marketRegion] ? settings.marketRegion : MARKET_COUNTRIES[country].region;
+  return {
+    scope,
+    country,
+    countryName: MARKET_COUNTRIES[country].name,
+    region,
+    regionName: MARKET_REGIONS[region]
+  };
 }
 
-function googleSearchUrl(album) {
-  return `https://www.google.com/search?q=${encodeURIComponent(googleQuery(album))}`;
+function googleQuery(album, settings = {}) {
+  const base = `${cleanField(album.artist)} - ${cleanField(album.album)} buy`;
+  const market = marketPreference(settings);
+  if (market.scope === "country") return `${base} ${market.countryName}`;
+  if (market.scope === "region") return `${base} ${market.regionName}`;
+  return base;
+}
+
+function googleSearchUrl(album, settings = {}) {
+  return `https://www.google.com/search?q=${encodeURIComponent(googleQuery(album, settings))}`;
+}
+
+function priceRecord(amount, currency, exchangeRatesToAud, budgetCurrency = "AUD") {
+  const numeric = Number(amount);
+  if (!Number.isFinite(numeric) || numeric < 0) return null;
+  const code = normaliseCurrency(currency);
+  const aud = convertCurrency(numeric, code, "AUD", exchangeRatesToAud);
+  const budgetCode = normaliseCurrency(budgetCurrency);
+  const budgetAmount = convertCurrency(numeric, code, budgetCode, exchangeRatesToAud);
+  return {
+    amount: numeric,
+    currency: code,
+    display: `${code} ${numeric.toFixed(2)}`,
+    aud,
+    audDisplay: aud === null ? "" : `AUD ${aud.toFixed(2)}`,
+    budgetCurrency: budgetCode,
+    budgetAmount,
+    budgetDisplay: budgetAmount === null ? "" : `${budgetCode} ${budgetAmount.toFixed(2)}`,
+    convertedPrices: Object.fromEntries(["AUD", "USD", "GBP", "EUR"].map(target => [
+      target,
+      convertCurrency(numeric, code, target, exchangeRatesToAud)
+    ]))
+  };
 }
 
 function parsePrice(text, candidate, url, exchangeRatesToAud, budgetCurrency = "AUD") {
@@ -205,25 +271,171 @@ function parsePrice(text, candidate, url, exchangeRatesToAud, budgetCurrency = "
     if (!match) continue;
     const amount = Number(match[1].replace(",", "."));
     if (!Number.isFinite(amount) || amount <= 0) continue;
-    const aud = convertCurrency(amount, item.currency, "AUD", exchangeRatesToAud);
-    const budgetCode = normaliseCurrency(budgetCurrency);
-    const budgetAmount = convertCurrency(amount, item.currency, budgetCode, exchangeRatesToAud);
-    return {
-      amount,
-      currency: item.currency,
-      display: `${item.currency} ${amount.toFixed(2)}`,
-      aud,
-      audDisplay: aud === null ? "" : `AUD ${aud.toFixed(2)}`,
-      budgetCurrency: budgetCode,
-      budgetAmount,
-      budgetDisplay: budgetAmount === null ? "" : `${budgetCode} ${budgetAmount.toFixed(2)}`,
-      convertedPrices: Object.fromEntries(["AUD", "USD", "GBP", "EUR"].map(currency => [
-        currency,
-        convertCurrency(amount, item.currency, currency, exchangeRatesToAud)
-      ]))
-    };
+    return priceRecord(amount, item.currency, exchangeRatesToAud, budgetCurrency);
   }
   return null;
+}
+
+function jsonLdDocuments(html) {
+  try {
+    const $ = load(String(html || ""));
+    return $('script[type="application/ld+json"]').toArray().flatMap(node => {
+      try {
+        const parsed = JSON.parse($(node).text());
+        return Array.isArray(parsed) ? parsed : [parsed];
+      } catch {
+        return [];
+      }
+    });
+  } catch {
+    return [];
+  }
+}
+
+function walkJson(value, visit) {
+  if (!value || typeof value !== "object") return;
+  visit(value);
+  for (const nested of Object.values(value)) {
+    if (Array.isArray(nested)) nested.forEach(item => walkJson(item, visit));
+    else if (nested && typeof nested === "object") walkJson(nested, visit);
+  }
+}
+
+function countryCode(value) {
+  const text = normaliseText(typeof value === "object" ? value?.name || value?.addressCountry || "" : value);
+  if (!text) return "";
+  const direct = String(value || "").trim().toUpperCase();
+  if (MARKET_COUNTRIES[direct]) return direct;
+  return Object.entries(MARKET_COUNTRIES).find(([, country]) => {
+    const name = normaliseText(country.name);
+    return text === name || text.includes(name) || (country.name === "United States" && /\busa\b|united states of america/.test(text)) || (country.name === "United Kingdom" && /\buk\b|great britain/.test(text));
+  })?.[0] || "";
+}
+
+function sellerCountryFromHost(url) {
+  const host = vendorHost(url);
+  return Object.entries(MARKET_COUNTRIES).find(([, country]) => country.suffixes.some(suffix => host.endsWith(suffix)))?.[0] || "";
+}
+
+function structuredCommerceEvidence(html) {
+  const shippingRates = [];
+  const destinationCountries = new Set();
+  const addressCountries = [];
+  for (const document of jsonLdDocuments(html)) {
+    walkJson(document, object => {
+      for (const key of ["shippingDestination", "eligibleRegion"]) {
+        const destinations = Array.isArray(object[key]) ? object[key] : [object[key]];
+        destinations.filter(Boolean).forEach(destination => {
+          const code = countryCode(destination);
+          if (code) destinationCountries.add(code);
+        });
+      }
+      if (object.addressCountry) {
+        const code = countryCode(object.addressCountry);
+        if (code) addressCountries.push(code);
+      }
+      if (object.shippingRate !== undefined) {
+        const rate = object.shippingRate;
+        const amount = Number(typeof rate === "object" ? rate.value ?? rate.price ?? rate.amount : rate);
+        const currency = String((typeof rate === "object" ? rate.currency ?? rate.priceCurrency : "") || object.priceCurrency || "").toUpperCase();
+        if (Number.isFinite(amount) && amount >= 0 && ["AUD", "USD", "GBP", "EUR"].includes(currency)) {
+          shippingRates.push({ amount, currency });
+        }
+      }
+    });
+  }
+  return {
+    shippingRate: shippingRates[0] || null,
+    destinationCountries: [...destinationCountries],
+    sellerCountry: addressCountries.find(code => !destinationCountries.has(code)) || addressCountries[0] || ""
+  };
+}
+
+function shippingTextEvidence(text) {
+  const value = String(text || "").replace(/\s+/g, " ");
+  const snippets = [];
+  const pattern = /(?:shipping|delivery|postage|ships?\s+to)[^.!?]{0,180}/gi;
+  let match;
+  while ((match = pattern.exec(value)) && snippets.length < 20) snippets.push(match[0]);
+  return snippets.join(" | ");
+}
+
+function estimateDelivery(album, sellerCountry, settings) {
+  const destination = marketPreference(settings).country;
+  const sellerRegion = MARKET_COUNTRIES[sellerCountry]?.region || "";
+  const destinationRegion = MARKET_COUNTRIES[destination]?.region || "";
+  const format = String(album.format || "cd").toLowerCase();
+  const rates = sellerCountry && sellerCountry === destination
+    ? { cd: 8, vinyl: 12, cassette: 8 }
+    : sellerRegion && sellerRegion === destinationRegion
+      ? { cd: 15, vinyl: 24, cassette: 15 }
+      : { cd: 24, vinyl: 38, cassette: 22 };
+  return { amount: rates[format] || rates.cd, currency: "AUD" };
+}
+
+function deliveryEvidence(html, finalUrl, album, settings) {
+  const structured = structuredCommerceEvidence(html);
+  const evidence = productPageEvidence(html);
+  const shippingText = shippingTextEvidence(evidence);
+  const sellerCountry = structured.sellerCountry || sellerCountryFromHost(finalUrl);
+  const rates = settings.exchangeRatesToAud || {};
+  let rate = structured.shippingRate;
+  let accuracy = rate?.amount === 0 ? "free" : rate ? "site-rate" : "";
+
+  if (!rate && /free\s+(?:shipping|delivery|postage)|(?:shipping|delivery|postage)\s*:?\s*free/i.test(shippingText)) {
+    rate = { amount: 0, currency: album.budgetCurrency || settings.currency || "AUD" };
+    accuracy = "free";
+  }
+  if (!rate && shippingText) {
+    const parsed = parsePrice(shippingText, {}, finalUrl, rates, album.budgetCurrency);
+    if (parsed) {
+      rate = { amount: parsed.amount, currency: parsed.currency };
+      accuracy = "site-rate";
+    }
+  }
+  if (!rate) {
+    rate = estimateDelivery(album, sellerCountry, settings);
+    accuracy = "estimated";
+  }
+  const price = priceRecord(rate.amount, rate.currency, rates, album.budgetCurrency);
+  return {
+    ...price,
+    accuracy,
+    sellerCountry,
+    destinationCountry: marketPreference(settings).country,
+    destinationCountries: structured.destinationCountries,
+    shippingText
+  };
+}
+
+function marketEligibility(delivery, settings) {
+  const market = marketPreference(settings);
+  if (market.scope === "worldwide") return { accepted: true, label: "Worldwide" };
+  const sellerCountry = delivery.sellerCountry;
+  const destinations = new Set(delivery.destinationCountries || []);
+  const worldwide = /worldwide|international\s+(?:shipping|delivery)|ships?\s+internationally/i.test(delivery.shippingText || "");
+  if (market.scope === "country") {
+    const countryNamed = normaliseText(delivery.shippingText).includes(normaliseText(market.countryName));
+    return {
+      accepted: worldwide || sellerCountry === market.country || destinations.has(market.country) || countryNamed,
+      label: market.countryName
+    };
+  }
+  const sellerRegion = MARKET_COUNTRIES[sellerCountry]?.region;
+  const destinationRegion = [...destinations].some(code => MARKET_COUNTRIES[code]?.region === market.region);
+  const regionNamed = normaliseText(delivery.shippingText).includes(normaliseText(market.regionName));
+  return {
+    accepted: worldwide || sellerRegion === market.region || destinationRegion || regionNamed,
+    label: market.regionName
+  };
+}
+
+function deliveredPrices(itemPrice, delivery) {
+  return Object.fromEntries(["AUD", "USD", "GBP", "EUR"].map(currency => {
+    const item = Number(itemPrice.convertedPrices?.[currency]);
+    const shipping = Number(delivery.convertedPrices?.[currency]);
+    return [currency, Number.isFinite(item) && Number.isFinite(shipping) ? Number((item + shipping).toFixed(2)) : null];
+  }));
 }
 
 function hasPurchaseAction(text) {
@@ -235,15 +447,36 @@ function hasPurchaseAction(text) {
   return purchaseControl && !(conciseUnavailable || (structuredOutOfStock && !structuredInStock));
 }
 
+const FORMAT_PATTERNS = {
+  cd: /\bcd\b|compact\s+disc|digipak/i,
+  vinyl: /\bvinyl\b|\blp\b|\b\d?lp\b|12["”]/i,
+  cassette: /\bcassette\b|\btape\b/i
+};
+
 function hasPhysicalFormat(text, format) {
   const wanted = String(format || "cd").toLowerCase();
-  const patterns = {
-    cd: /\bcd\b|compact\s+disc/i,
-    vinyl: /\bvinyl\b|\blp\b|12["”]/i,
-    cassette: /\bcassette\b|\btape\b/i,
-    "box set": /\bbox\s*set\b|\bboxset\b/i
-  };
-  return (patterns[wanted] || new RegExp(`\\b${wanted.replace(/[^a-z0-9]+/g, "\\s*")}\\b`, "i")).test(String(text || ""));
+  return (FORMAT_PATTERNS[wanted] || new RegExp(`\\b${wanted.replace(/[^a-z0-9]+/g, "\\s*")}\\b`, "i")).test(String(text || ""));
+}
+
+function hasSelectedFormat(html, finalUrl, format) {
+  const wanted = String(format || "cd").toLowerCase();
+  let strongEvidence = "";
+  try {
+    const $ = load(String(html || ""));
+    strongEvidence = [
+      $("title").first().text(),
+      $('meta[property="og:title"]').attr("content"),
+      $("h1").first().text(),
+      $('[itemprop="name"]').first().text(),
+      decodeURIComponent(String(finalUrl || ""))
+    ].filter(Boolean).join(" ");
+  } catch {
+    strongEvidence = String(finalUrl || "");
+  }
+  if (hasPhysicalFormat(strongEvidence, wanted)) return true;
+  const conflictingFormat = Object.entries(FORMAT_PATTERNS)
+    .some(([name, pattern]) => name !== wanted && pattern.test(strongEvidence));
+  return !conflictingFormat && hasPhysicalFormat(productPageEvidence(html), wanted);
 }
 
 function productPageEvidence(html) {
@@ -320,7 +553,7 @@ function identityVerification(album, discogsSearch) {
 
 async function discoverAlbum(album, settings) {
   const limit = Math.max(10, Math.min(50, Number(settings.searchResultLimit || 20)));
-  const primary = await searchWeb(googleQuery(album), settings, { limit });
+  const primary = await searchWeb(googleQuery(album, settings), settings, { limit });
   let discogsSearch = { provider: primary.provider, query: primary.query, results: primary.results };
   if (!findIdentityResult(primary.results, "discogs.com", album)) {
     const query = `site:discogs.com ${cleanField(album.artist)} - ${cleanField(album.album)}`;
@@ -345,7 +578,7 @@ async function verifyCandidate(album, candidate, trustedVendors, discogs, settin
   const price = parsePrice(pageText, candidate, finalUrl, settings.exchangeRatesToAud || {}, album.budgetCurrency);
   const purchaseActionFound = hasPurchaseAction(html);
   const pageMatchesAlbum = hasAlbumIdentity(productEvidence, album) || hasAlbumIdentity(finalUrl, album);
-  const formatMatches = hasPhysicalFormat(productEvidence, album.format);
+  const formatMatches = hasSelectedFormat(html, finalUrl, album.format);
   if (!price || !purchaseActionFound || !pageMatchesAlbum || !formatMatches) {
     return {
       accepted: false,
@@ -354,6 +587,14 @@ async function verifyCandidate(album, candidate, trustedVendors, discogs, settin
   }
   if (!discogs.ok) return { accepted: false, reason: "Discogs could not verify the release identity." };
 
+  const delivery = deliveryEvidence(html, finalUrl, album, settings);
+  const market = marketEligibility(delivery, settings);
+  if (!market.accepted) {
+    return { accepted: false, reason: `Seller location or delivery coverage could not be confirmed for ${market.label}.` };
+  }
+  const delivered = deliveredPrices(price, delivery);
+  const budgetCurrency = price.budgetCurrency;
+
   const host = vendorHost(finalUrl);
   const verifiedAt = new Date().toISOString();
   return {
@@ -361,6 +602,7 @@ async function verifyCandidate(album, candidate, trustedVendors, discogs, settin
     listingId: `${makeId(album.artist, album.album)}-${host}-${Date.now()}`,
     artist: cleanField(album.artist),
     album: cleanField(album.album),
+    format: album.format || "cd",
     url: finalUrl,
     host,
     marketplace: cleanField(candidate.vendor, host),
@@ -373,6 +615,18 @@ async function verifyCandidate(album, candidate, trustedVendors, discogs, settin
     budgetAmount: price.budgetAmount,
     budgetDisplay: price.budgetDisplay,
     convertedPrices: price.convertedPrices,
+    deliveryCost: delivery.amount,
+    deliveryCurrency: delivery.currency,
+    deliveryDisplay: delivery.display,
+    deliveryConvertedPrices: delivery.convertedPrices,
+    deliveryAccuracy: delivery.accuracy,
+    deliveryDestination: MARKET_COUNTRIES[delivery.destinationCountry]?.name || delivery.destinationCountry,
+    sellerCountry: delivery.sellerCountry,
+    marketScope: marketPreference(settings).scope,
+    marketLabel: market.label,
+    deliveredConvertedPrices: delivered,
+    deliveredBudgetAmount: delivered[budgetCurrency],
+    deliveredBudgetDisplay: Number.isFinite(delivered[budgetCurrency]) ? `${budgetCurrency} ${delivered[budgetCurrency].toFixed(2)}` : "",
     purchaseActionFound: true,
     purchaseAction: cleanField(candidate.purchaseAction),
     verifiedPurchase: true,
@@ -400,8 +654,10 @@ async function scanAlbum(album, trustedVendors, settings) {
     priority: album.priority,
     lastChecked: new Date().toISOString(),
     searchOrder: ["Exact web query", "Discogs identity check", "Direct seller-page verification"],
-    googleQuery: googleQuery(album),
-    googleSearchUrl: googleSearchUrl(album),
+    googleQuery: googleQuery(album, settings),
+    googleSearchUrl: googleSearchUrl(album, settings),
+    marketScope: marketPreference(settings).scope,
+    marketLabel: marketPreference(settings).scope === "country" ? marketPreference(settings).countryName : marketPreference(settings).scope === "region" ? marketPreference(settings).regionName : "Worldwide",
     scanCompleted: true,
     listings: [],
     rejected: []
@@ -592,9 +848,13 @@ module.exports = {
   googleSearchUrl,
   hasAlbumIdentity,
   hasPhysicalFormat,
+  hasSelectedFormat,
   hasPurchaseAction,
   identityVerification,
   parsePrice,
+  deliveryEvidence,
+  marketEligibility,
+  marketPreference,
   productPageEvidence,
   resultMatchesAlbum,
   scanAlbum

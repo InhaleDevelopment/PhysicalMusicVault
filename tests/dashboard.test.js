@@ -7,9 +7,15 @@ const html = fs.readFileSync(path.resolve(__dirname, "../outputs/physical-music-
 const css = fs.readFileSync(path.resolve(__dirname, "../outputs/vault.css"), "utf8");
 
 test("dashboard exposes the required catalogue controls", () => {
-  for (const text of ["Wanted", "Owned", "Not Interested", "Priority", "Budget Currency"]) {
+  for (const text of ["Wanted", "Owned", "Not Interested", "Priority", "Budget currency", "CD", "Vinyl", "Cassette"]) {
     assert.match(html, new RegExp(text));
   }
+  assert.doesNotMatch(html, /option value="box set"/i);
+});
+
+test("web scanning requires informed opt-in", () => {
+  assert.match(html, /Artist and album search terms will be sent/);
+  assert.match(html, /window\.confirm\("Enable web scanning\?/);
 });
 
 test("dashboard contains the required result portals", () => {
@@ -40,9 +46,21 @@ test("library controls and copy are provider-neutral", () => {
 });
 
 test("album artwork uses stable square containers without distortion", () => {
-  assert.match(css, /--cover-size:\s*88px/);
-  assert.match(css, /height:\s*var\(--cover-size/);
+  assert.match(css, /\.shelf-cover-frame[\s\S]*aspect-ratio:\s*1/);
+  assert.match(css, /\.shelf-cover-frame \.album-cover[\s\S]*height:\s*100%/);
   assert.match(css, /aspect-ratio:\s*1/);
   assert.match(css, /object-fit:\s*cover/);
   assert.match(css, /object-position:\s*center/);
+});
+
+test("collection is an interactive shelf with centred detail controls", () => {
+  assert.match(html, /class="shelf-album"/);
+  assert.match(html, /data-album-tile=/);
+  assert.match(html, /class="album-detail-layout"/);
+  assert.match(html, /data-editor-group="format"/);
+});
+
+test("dashboard exposes market and delivered-cost controls", () => {
+  for (const id of ["marketScope", "marketCountry", "marketRegion"]) assert.match(html, new RegExp(`id="${id}"`));
+  for (const text of ["Worldwide", "Country", "Region", "Delivery", "Total"]) assert.match(html, new RegExp(text));
 });

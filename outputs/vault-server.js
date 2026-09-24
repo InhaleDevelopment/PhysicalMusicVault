@@ -35,8 +35,18 @@ const trustedVendorsPath = path.join(dataRoot, "trusted-vendors.json");
 const agentStatusPath = path.join(dataRoot, "agent-status.json");
 const syncResultPath = path.join(dataRoot, "vault-sync-results.json");
 const defaultMusicRoot = path.join(os.homedir(), "Music");
+const hostTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+const inferredMarket = /^Australia\//.test(hostTimeZone)
+  ? { country: "AU", region: "oceania" }
+  : /^Pacific\/Auckland$/.test(hostTimeZone)
+    ? { country: "NZ", region: "oceania" }
+    : /^Europe\//.test(hostTimeZone)
+      ? { country: hostTimeZone === "Europe/London" ? "GB" : "DE", region: "europe" }
+      : /^Asia\/Tokyo$/.test(hostTimeZone)
+        ? { country: "JP", region: "asia" }
+        : { country: "US", region: "north-america" };
 const defaultSettings = {
-  automationEnabled: true,
+  automationEnabled: false,
   webAccessEnabled: true,
   allowLanAccess: false,
   scanIntervalMs: 30 * 60 * 1000,
@@ -48,8 +58,11 @@ const defaultSettings = {
   searchResultLimit: 20,
   maxListingsPerAlbum: 12,
   libraryRoot: "",
-  timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+  timeZone: hostTimeZone,
   currency: "USD",
+  marketScope: "worldwide",
+  marketCountry: inferredMarket.country,
+  marketRegion: inferredMarket.region,
   exchangeRatesToAud: { AUD: 1, USD: 1.52, EUR: 1.65, GBP: 1.95 }
 };
 let settings = loadSettings();
@@ -452,6 +465,14 @@ function mergeAvailability(vault, updates) {
       currency: verified ? bestListing.originalCurrency || update.currency : "",
       audPrice: verified ? bestListing.audPrice || update.audPrice : "",
       audDisplay: verified ? bestListing.audDisplay || update.audDisplay : "",
+      deliveryCost: verified ? bestListing.deliveryCost : "",
+      deliveryCurrency: verified ? bestListing.deliveryCurrency : "",
+      deliveryDisplay: verified ? bestListing.deliveryDisplay : "",
+      deliveryAccuracy: verified ? bestListing.deliveryAccuracy : "",
+      deliveredBudgetAmount: verified ? bestListing.deliveredBudgetAmount : "",
+      deliveredBudgetDisplay: verified ? bestListing.deliveredBudgetDisplay : "",
+      marketScope: bestListing.marketScope || update.marketScope || old.marketScope,
+      marketLabel: bestListing.marketLabel || update.marketLabel || old.marketLabel,
       marketplace: verified ? bestListing.marketplace || update.marketplace : "Google",
       seller: update.seller || old.seller,
       availableAt: bestListing.listingFoundAt || update.availableAt || old.availableAt,
@@ -552,7 +573,15 @@ function readVault() {
         listingUrl: best.url || "",
         currentCost: best.currentCost || "",
         audPrice: best.audPrice || "",
-        audDisplay: best.audDisplay || ""
+        audDisplay: best.audDisplay || "",
+        deliveryCost: best.deliveryCost ?? "",
+        deliveryCurrency: best.deliveryCurrency || "",
+        deliveryDisplay: best.deliveryDisplay || "",
+        deliveryAccuracy: best.deliveryAccuracy || "",
+        deliveredBudgetAmount: best.deliveredBudgetAmount ?? "",
+        deliveredBudgetDisplay: best.deliveredBudgetDisplay || "",
+        marketScope: best.marketScope || normalised.marketScope,
+        marketLabel: best.marketLabel || normalised.marketLabel
       });
     }) : [];
     vault.source = "Local music folder and imported catalogue files";
@@ -627,7 +656,10 @@ function editableAlbumChanges(payload = {}) {
   }
   if (changes.status !== undefined) changes.status = normaliseStatus(changes.status);
   if (changes.priority !== undefined) changes.priority = Math.max(1, Math.min(5, Math.round(Number(changes.priority) || 3)));
-  if (changes.format !== undefined) changes.format = String(changes.format || "cd").toLowerCase().slice(0, 40);
+  if (changes.format !== undefined) {
+    const format = String(changes.format || "cd").toLowerCase();
+    changes.format = ["cd", "vinyl", "cassette"].includes(format) ? format : "cd";
+  }
   if (changes.budgetCurrency !== undefined && !["AUD", "USD", "GBP", "EUR"].includes(String(changes.budgetCurrency).toUpperCase())) {
     delete changes.budgetCurrency;
   }

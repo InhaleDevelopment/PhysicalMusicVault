@@ -7,12 +7,14 @@ Version 3 is a dependency-light Node.js application with no account, cloud datab
 ## Product Flow
 
 1. Watch any configured `<Artist>/<Album>` music folder for changes and reconcile it every 10 minutes, or import a CSV/JSON catalogue.
-2. Keep catalogue status separate from a 1-5 purchase priority and a per-album price range.
-3. Select up to 500 Wanted albums per local calendar day, highest priority first.
-4. Search the exact query `Artist - Album buy` using a free, keyless provider or an optional self-hosted SearXNG instance.
-5. Cross-check the artist and release against Discogs across every genre.
-6. Accept a result only when the direct seller page proves the artist, album, physical format, numeric price, and an active purchase control.
-7. Show new finds, the Top 100 priority-ranked available albums, and all current priority 5 matches.
+2. Browse an artwork-first chronological shelf and open any cover into a focused album workspace.
+3. Keep catalogue status separate from a 1-5 purchase priority, CD/vinyl/cassette target, and per-album delivered-price range.
+4. Select up to 500 Wanted albums per local calendar day, highest priority first.
+5. Search `Artist - Album buy`, optionally narrowed to a country or region, using a free keyless provider or self-hosted SearXNG.
+6. Cross-check the artist and release against Discogs across every genre.
+7. Accept a result only when the direct seller page proves the artist, album, selected format, numeric price, active purchase control, and any requested market restriction.
+8. Extract a seller shipping rate where published; otherwise show a format- and distance-based estimate and keep it visibly labelled.
+9. Show new finds, the Top 100 priority-ranked available albums, and all current priority 5 matches with item, delivery, and total prices.
 
 Local album artwork is served through album IDs and never exposes its filesystem path to the browser.
 
@@ -24,8 +26,10 @@ Prices are converted among AUD, USD, GBP, and EUR using daily reference rates fr
 2. Double-click `outputs/Vault On-Off.cmd`.
 3. The first start installs the open-source parser dependency and opens `http://localhost:8787/`.
 4. In Settings, point **Synced source folder** to the folder containing `<Artist>/<Album>` directories, or import a CSV/JSON catalogue.
-5. Mark albums Wanted, Owned, or Not Interested and set priority, format, and price range.
-6. Select **Today's 500**, then use **Scan Next 25** or leave 30-minute automation enabled.
+5. Open an album cover, mark it Wanted, Owned, or Not Interested, then set priority, format, and delivered-price range.
+6. In Settings, choose Worldwide, Country, or Region results and the country used for delivery calculations.
+7. Enable **Automated availability scanning** when ready. The consent prompt explains that artist and album terms are sent to the selected search provider and matching seller pages are visited.
+8. Select **Today's 500**, then use **Scan Next 25** or leave 30-minute automation enabled.
 
 Double-click `Vault On-Off.cmd` again to stop the dashboard. The built-in provider needs no API key, account, card, or paid plan.
 
@@ -42,6 +46,8 @@ The source path stays in the private local settings file and is never returned b
 - **Built-in keyless search** is the default and works without configuration. It is best effort and may be temporarily rate-limited by the upstream service.
 - **Self-hosted SearXNG** is optional. Set its URL in Settings when greater control and multiple search engines are needed.
 
+Country and region modes require seller-location or delivery-coverage evidence. Worldwide mode does not restrict seller location. Delivery charges marked **site rate** come from seller-page structured or visible shipping data; **Est.** charges use conservative format and distance bands because many shops calculate the final rate only after an address is entered.
+
 No search product can guarantee every item on the public internet. Shops may be unindexed, require a login, render only in a browser, or block automated access. The vault aims for broad indexed coverage and rejects results it cannot verify rather than presenting uncertain purchase links.
 
 Known digital-only stores are excluded even when a page uses phrases such as “CD quality.” Indirect review, video, wiki, and search pages can help confirm identity but are never accepted as seller links.
@@ -53,7 +59,7 @@ Turn on **iPhone and iPad access** in Settings, turn the vault off and on once, 
 ## Privacy
 
 - Library data, preferences, scan history, and trusted vendors stay in ignored files under `outputs/`.
-- Search requests contain artist, album, format, and public search terms only. Local paths and music-service account details are never sent.
+- Search requests contain artist, album, public market terms, and release-search terms only. Local paths and music-service account details are never sent.
 - The browser reports its IANA timezone to the local server so daily queues and timestamps match the user's device.
 - The app does not change Windows proxy, DNS, hosts, or firewall settings. It makes ordinary outbound HTTPS requests from Node.js.
 - The server binds to localhost by default; private-network listening is opt-in.
@@ -70,6 +76,9 @@ A listing is accepted only when:
 4. A numeric price is present.
 5. Add To Cart, Add To Basket, Buy Now, or Buy It Now is present.
 6. Structured stock data does not mark the item unavailable.
+7. A country or region restriction, when selected, is supported by seller origin or delivery evidence.
+
+The displayed total is the item price plus a published shipping charge or a clearly labelled estimate converted into the user's budget currency. Final checkout tax, duties, and address-specific surcharges remain the seller's authority.
 
 Accepted seller domains are stored locally as trusted vendors and prioritised in later scans. Search-result redirect URLs are never used as purchase links.
 

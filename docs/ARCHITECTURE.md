@@ -8,7 +8,7 @@ Physical Music Vault is intentionally local-first and dependency-light. A Node.j
 | --- | --- |
 | `vault-server.js` | HTTP API, same-origin mutation checks, scan and sync orchestration, private/public data boundary |
 | `vault-sync.js` | Artist/album folder discovery, artwork discovery, and non-destructive catalogue reconciliation |
-| `availability-scanner.js` | Search discovery, release identity checks, direct seller-page verification, currency conversion |
+| `availability-scanner.js` | Search discovery, identity checks, seller-page verification, market filtering, shipping extraction, currency conversion |
 | `web-search.js` | Free keyless search with optional self-hosted SearXNG support |
 | `scan-plan.js` | Local-day queue selection, priority ordering, request accounting, and retry state |
 | `catalog-model.js` | Catalogue invariants, money helpers, physical-source policy, and sorting |
@@ -35,12 +35,15 @@ A search result becomes a listing only when all of these checks pass:
 4. Product-page evidence names the selected physical format.
 5. The page exposes a positive numeric price.
 6. The page exposes Add To Cart, Add To Basket, Buy Now, or Buy It Now and is not marked unavailable.
+7. When a country or region is selected, seller origin or delivery evidence matches that market.
+
+Shipping uses structured `OfferShippingDetails` or explicit page text first. If a seller withholds the rate until checkout, the scanner stores a conservative estimate based on format and the inferred seller-to-destination distance. Exact, free, and estimated amounts are distinct data states; delivered totals combine item and shipping conversions without disguising estimates as seller quotes.
 
 The policy favours precision over recall: uncertain pages are rejected.
 
 ## Persistence
 
-Runtime files live beside the app by default and are ignored by Git. Set `VAULT_DATA_DIR` to keep runtime data elsewhere and `MUSIC_ROOT` to select a library folder without using the local Settings control. JSON state is written through temporary files and atomic renames.
+Runtime files live beside the app by default and are ignored by Git. This includes market, destination, library, and catalogue preferences. Set `VAULT_DATA_DIR` to keep runtime data elsewhere and `MUSIC_ROOT` to select a library folder without using the local Settings control. JSON state is written through temporary files and atomic renames.
 
 ## Network Boundary
 

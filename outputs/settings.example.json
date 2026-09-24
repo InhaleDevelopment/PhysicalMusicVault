@@ -1,5 +1,5 @@
 {
-  "automationEnabled": true,
+  "automationEnabled": false,
   "webAccessEnabled": true,
   "allowLanAccess": false,
   "scanIntervalMs": 1800000,
@@ -12,6 +12,9 @@
   "maxListingsPerAlbum": 12,
   "libraryRoot": "",
   "currency": "USD",
+  "marketScope": "worldwide",
+  "marketCountry": "US",
+  "marketRegion": "north-america",
   "exchangeRatesToAud": {
     "AUD": 1,
     "USD": 1.52,

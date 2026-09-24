@@ -6,7 +6,8 @@ const {
   convertCurrency,
   isKnownDigitalOnlyUrl,
   isSearchEligible,
-  normaliseAlbum
+  normaliseAlbum,
+  normaliseFormat
 } = require("../outputs/catalog-model");
 
 test("normalises the three catalogue statuses and legacy priority", () => {
@@ -30,6 +31,13 @@ test("normalises priority, currency and price limits", () => {
   assert.equal(album.budgetCurrency, "GBP");
   assert.equal(album.minPrice, 5);
   assert.equal(album.maxPrice, 20.5);
+});
+
+test("only supports CD, vinyl and cassette as target formats", () => {
+  assert.equal(normaliseFormat("Compact Disc"), "cd");
+  assert.equal(normaliseFormat("LP"), "vinyl");
+  assert.equal(normaliseFormat("tape"), "cassette");
+  assert.equal(normaliseFormat("box set"), "cd");
 });
 
 test("converts through AUD reference rates", () => {

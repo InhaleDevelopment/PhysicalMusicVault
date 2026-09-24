@@ -96,6 +96,15 @@ function normaliseSettingsUpdate(payload = {}) {
   if (["AUD", "USD", "GBP", "EUR"].includes(String(payload.currency || "").toUpperCase())) {
     next.currency = String(payload.currency).toUpperCase();
   }
+  if (["worldwide", "country", "region"].includes(payload.marketScope)) {
+    next.marketScope = payload.marketScope;
+  }
+  if (/^[A-Z]{2}$/.test(String(payload.marketCountry || "").toUpperCase())) {
+    next.marketCountry = String(payload.marketCountry).toUpperCase();
+  }
+  if (["oceania", "north-america", "south-america", "europe", "asia", "africa"].includes(payload.marketRegion)) {
+    next.marketRegion = payload.marketRegion;
+  }
   return next;
 }
 

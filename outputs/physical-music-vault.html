@@ -658,8 +658,8 @@
     <main>
       <header class="page-title">
         <div>
-          <span class="eyebrow">Local collection intelligence</span>
-          <h1>Available physical releases</h1>
+          <span id="pageEyebrow" class="eyebrow">Local collection intelligence</span>
+          <h1 id="pageHeading">Available physical releases</h1>
         </div>
         <p id="dashboardSubtitle" class="subtle page-context">Library and seller results update on this device.</p>
       </header>
@@ -735,17 +735,16 @@
           </select>
           <select id="formatFilter" aria-label="Format filter">
             <option value="all">All formats</option>
-            <option value="vinyl">Vinyl</option>
             <option value="cd">CD</option>
+            <option value="vinyl">Vinyl</option>
             <option value="cassette">Cassette</option>
-            <option value="box set">Box set</option>
           </select>
           <select id="sortSelect" aria-label="Sort albums">
+            <option value="added">Newest added</option>
             <option value="artist">Artist</option>
             <option value="album">Album</option>
             <option value="status">Status</option>
             <option value="priority">Priority</option>
-            <option value="added">Date added</option>
           </select>
         </div>
         <div class="collection-meta"><p id="collectionResultCount" class="subtle">0 albums</p><p class="subtle">Wanted albums enter the search queue. Owned and Not Interested albums stay out.</p></div>
@@ -777,7 +776,7 @@
             <label class="settings-toggle">
               <span>
                 <strong>Automated availability scanning</strong>
-                <span class="subtle">Check Wanted albums every 30 minutes, with priority 5 releases first and a daily ceiling of 500.</span>
+                <span class="subtle">Check Wanted albums every 30 minutes, with priority 5 releases first and a daily ceiling of 500. Enabling this sends artist and album search terms to the selected search provider and visits matching seller pages.</span>
               </span>
               <input id="automationToggle" type="checkbox" aria-label="Automated availability scanning">
             </label>
@@ -800,6 +799,50 @@
               </label>
               <button id="saveSearchSettingsButton" class="primary" type="button">Save</button>
             </div>
+            </div>
+            <div class="settings-control">
+              <div>
+                <strong>Buying market</strong>
+                <p class="subtle">Filter sellers by location or delivery coverage. Delivery is calculated to your selected country.</p>
+              </div>
+              <div class="settings-form market-settings-form">
+                <label>
+                  <span class="label">Results</span>
+                  <select id="marketScope">
+                    <option value="worldwide">Worldwide</option>
+                    <option value="country">Country</option>
+                    <option value="region">Region</option>
+                  </select>
+                </label>
+                <label>
+                  <span class="label">Country</span>
+                  <select id="marketCountry">
+                    <option value="AU">Australia</option>
+                    <option value="NZ">New Zealand</option>
+                    <option value="US">United States</option>
+                    <option value="CA">Canada</option>
+                    <option value="GB">United Kingdom</option>
+                    <option value="DE">Germany</option>
+                    <option value="FR">France</option>
+                    <option value="NL">Netherlands</option>
+                    <option value="IT">Italy</option>
+                    <option value="ES">Spain</option>
+                    <option value="JP">Japan</option>
+                  </select>
+                </label>
+                <label>
+                  <span class="label">Region</span>
+                  <select id="marketRegion">
+                    <option value="oceania">Oceania</option>
+                    <option value="north-america">North America</option>
+                    <option value="south-america">South America</option>
+                    <option value="europe">Europe</option>
+                    <option value="asia">Asia</option>
+                    <option value="africa">Africa</option>
+                  </select>
+                </label>
+                <button id="saveMarketSettingsButton" class="primary" type="button">Save market</button>
+              </div>
             </div>
           </section>
 
@@ -868,57 +911,71 @@
     <form method="dialog" class="dialog-inner" id="albumForm">
       <div class="dialog-head">
         <div>
+          <span id="dialogEyebrow" class="eyebrow">Collection record</span>
           <h2 id="dialogTitle">Add Album</h2>
-          <p class="subtle">Customise the item you want to hunt down.</p>
         </div>
-        <button class="icon" value="cancel" type="submit" formnovalidate aria-label="Close editor" title="Close">X</button>
+        <button class="icon" value="cancel" type="submit" formnovalidate aria-label="Close editor" title="Close">&times;</button>
       </div>
       <input id="editId" type="hidden">
-      <div class="form-grid">
-        <label>Album<input id="editAlbum" type="text" required></label>
-        <label>Artist<input id="editArtist" type="text" required></label>
-        <label>Year<input id="editYear" type="text"></label>
-        <label>Genre<input id="editGenre" type="text"></label>
-        <label>Status
-          <select id="editStatus">
-            <option value="wanted">Wanted</option>
-            <option value="owned">Owned</option>
-            <option value="excluded">Not Interested</option>
-          </select>
-        </label>
-        <label>Priority
-          <select id="editPriority">
-            <option value="5">5 - Essential</option>
-            <option value="4">4 - High</option>
-            <option value="3">3 - Medium</option>
-            <option value="2">2 - Low</option>
-            <option value="1">1 - Passive</option>
-          </select>
-        </label>
-        <label>Target Format
-          <select id="editFormat">
-            <option value="vinyl">Vinyl</option>
-            <option value="cd">CD</option>
-            <option value="cassette">Cassette</option>
-            <option value="box set">Box set</option>
-          </select>
-        </label>
+      <div class="album-detail-layout">
+        <div class="album-detail-visual">
+          <div id="dialogArtwork" class="dialog-artwork" aria-hidden="true"></div>
+          <div id="dialogListings" class="dialog-listings"></div>
+        </div>
+        <div class="album-detail-fields">
+          <div class="form-grid">
+            <label>Album<input id="editAlbum" type="text" required></label>
+            <label>Artist<input id="editArtist" type="text" required></label>
+            <label>Year<input id="editYear" type="text"></label>
+            <label>Genre<input id="editGenre" type="text"></label>
+          </div>
+          <fieldset class="choice-group">
+            <legend>Collection status</legend>
+            <input id="editStatus" type="hidden" value="wanted">
+            <div class="segment-control" data-editor-group="status">
+              <button type="button" data-value="wanted">Wanted</button>
+              <button type="button" data-value="owned">Owned</button>
+              <button type="button" data-value="excluded">Not Interested</button>
+            </div>
+          </fieldset>
+          <fieldset class="choice-group">
+            <legend>Physical format</legend>
+            <input id="editFormat" type="hidden" value="cd">
+            <div class="segment-control" data-editor-group="format">
+              <button type="button" data-value="cd">CD</button>
+              <button type="button" data-value="vinyl">Vinyl</button>
+              <button type="button" data-value="cassette">Cassette</button>
+            </div>
+          </fieldset>
+          <div class="form-grid detail-controls">
+            <label>Priority
+              <select id="editPriority">
+                <option value="5">5 - Essential</option>
+                <option value="4">4 - High</option>
+                <option value="3">3 - Medium</option>
+                <option value="2">2 - Low</option>
+                <option value="1">1 - Passive</option>
+              </select>
+            </label>
+            <label>Known item price<input id="editCurrentCost" type="text" placeholder="24.99"></label>
+            <label>Minimum delivered price<input id="editMinPrice" type="text" placeholder="0"></label>
+            <label>Maximum delivered price<input id="editMaxPrice" type="text" placeholder="35"></label>
+            <label>Budget currency
+              <select id="editBudgetCurrency">
+                <option value="AUD">AUD - Australian Dollar</option>
+                <option value="USD">USD - US Dollar</option>
+                <option value="GBP">GBP - British Pound</option>
+                <option value="EUR">EUR - Euro</option>
+              </select>
+            </label>
+          </div>
+          <details class="detail-notes">
+            <summary>Notes and manual link</summary>
+            <label>Purchase link<input id="editPurchaseUrl" type="text" placeholder="https://"></label>
+            <label>Notes<textarea id="editNotes"></textarea></label>
+          </details>
+        </div>
       </div>
-      <label>Current Cost<input id="editCurrentCost" type="text" placeholder="$24.99"></label>
-      <div class="form-grid">
-        <label>Minimum Price<input id="editMinPrice" type="text" placeholder="$0"></label>
-        <label>Maximum Price<input id="editMaxPrice" type="text" placeholder="$35"></label>
-        <label>Budget Currency
-          <select id="editBudgetCurrency">
-            <option value="AUD">AUD - Australian Dollar</option>
-            <option value="USD">USD - US Dollar</option>
-            <option value="GBP">GBP - British Pound</option>
-            <option value="EUR">EUR - Euro</option>
-          </select>
-        </label>
-      </div>
-      <label>Purchase Link<input id="editPurchaseUrl" type="text" placeholder="https://"></label>
-      <label>Notes<textarea id="editNotes"></textarea></label>
       <div class="row">
         <button class="primary grow" id="saveAlbumButton" value="default" type="submit">Save Album</button>
         <button class="danger" id="deleteAlbumButton" value="delete" type="submit">Delete</button>
@@ -942,7 +999,7 @@
       query: "",
       status: "all",
       format: "all",
-      sort: "artist",
+      sort: "added",
       view: "home",
       dailyPlanVisibleCount: 25,
       libraryVisibleCount: 60,
@@ -973,11 +1030,17 @@
       lanAccessToggle: document.getElementById("lanAccessToggle"),
       searchProvider: document.getElementById("searchProvider"),
       searxngUrl: document.getElementById("searxngUrl"),
+      marketScope: document.getElementById("marketScope"),
+      marketCountry: document.getElementById("marketCountry"),
+      marketRegion: document.getElementById("marketRegion"),
+      saveMarketSettingsButton: document.getElementById("saveMarketSettingsButton"),
       saveSearchSettingsButton: document.getElementById("saveSearchSettingsButton"),
       libraryFolderPath: document.getElementById("libraryFolderPath"),
       libraryFolderStatus: document.getElementById("libraryFolderStatus"),
       saveLibraryFolderButton: document.getElementById("saveLibraryFolderButton"),
       timeZoneValue: document.getElementById("timeZoneValue"),
+      pageEyebrow: document.getElementById("pageEyebrow"),
+      pageHeading: document.getElementById("pageHeading"),
       dashboardSubtitle: document.getElementById("dashboardSubtitle"),
       selectDailyScanButton: document.getElementById("selectDailyScanButton"),
       scanSelectedBatchButton: document.getElementById("scanSelectedBatchButton"),
@@ -1008,6 +1071,9 @@
       dialog: document.getElementById("albumDialog"),
       form: document.getElementById("albumForm"),
       dialogTitle: document.getElementById("dialogTitle"),
+      dialogEyebrow: document.getElementById("dialogEyebrow"),
+      dialogArtwork: document.getElementById("dialogArtwork"),
+      dialogListings: document.getElementById("dialogListings"),
       editId: document.getElementById("editId"),
       editAlbum: document.getElementById("editAlbum"),
       editArtist: document.getElementById("editArtist"),
@@ -1188,7 +1254,8 @@
       const album = readField(raw, ["Album", "album", "Collection Name"]);
       const artist = readField(raw, ["Album Artist", "Artist", "artist", "Artist Name"]);
       if (!album || !artist) return null;
-      const format = readField(raw, ["Format", "format"]) || "cd";
+      const sourceFormat = clean(readField(raw, ["Format", "format"]) || "cd").toLowerCase();
+      const format = sourceFormat === "compact disc" ? "cd" : ["cd", "vinyl", "cassette"].includes(sourceFormat) ? sourceFormat : "cd";
       return {
         id: makeId(artist, album),
         album: clean(album),
@@ -1198,7 +1265,7 @@
         dateAdded: clean(readField(raw, ["Date Added", "dateAdded", "Date Added To Library"]) || new Date().toISOString().slice(0, 10)),
         status: normaliseStatus(readField(raw, ["Status", "status"]) || "wanted"),
         priority: Math.max(1, Math.min(5, Number(readField(raw, ["Priority", "priority"]) || 3))),
-        format: clean(format).toLowerCase(),
+        format,
         purchaseUrl: clean(readField(raw, ["Purchase Link", "Purchase URL", "purchaseUrl"]) || ""),
         currentCost: clean(readField(raw, ["Current Cost", "currentCost", "Price", "price", "Lowest Price", "lowestPrice"]) || ""),
         minPrice: clean(readField(raw, ["Minimum Price", "Min Price", "minPrice", "priceMin"]) || ""),
@@ -1340,19 +1407,42 @@
       return match ? Number(match[1]) : null;
     }
 
+    function isMoneyValue(value) {
+      return value !== undefined && value !== null && value !== "" && Number.isFinite(Number(value));
+    }
+
     function formatPrice(item) {
       const preferredCurrency = String(item.budgetCurrency || state.vaultMeta?.settings?.currency || deviceCurrency()).toUpperCase();
       const preferredAmount = item.convertedPrices?.[preferredCurrency] ?? item.budgetAmount;
-      if (Number.isFinite(Number(preferredAmount))) return `${preferredCurrency} ${Number(preferredAmount).toFixed(2)}`;
+      if (isMoneyValue(preferredAmount)) return `${preferredCurrency} ${Number(preferredAmount).toFixed(2)}`;
       if (item.budgetDisplay) return item.budgetDisplay;
       if (item.audDisplay) return item.audDisplay;
-      if (Number.isFinite(Number(item.audPrice))) return `AUD ${Number(item.audPrice).toFixed(2)}`;
+      if (isMoneyValue(item.audPrice)) return `AUD ${Number(item.audPrice).toFixed(2)}`;
       const raw = item.currentCost ?? item.price ?? item.lowestPrice ?? item.originalAmount;
       const value = parsePrice(raw);
       if (value === null) return "";
       const currency = item.currency || item.originalCurrency || inferCurrencyCode(raw);
       const prefix = ["AUD", "USD", "EUR", "GBP"].includes(currency) ? `${currency} ` : currency;
       return `${prefix}${value.toFixed(2)}`;
+    }
+
+    function formatDeliveryPrice(item) {
+      const preferredCurrency = String(item.budgetCurrency || state.vaultMeta?.settings?.currency || deviceCurrency()).toUpperCase();
+      const amount = item.deliveryConvertedPrices?.[preferredCurrency];
+      if (isMoneyValue(amount)) {
+        const price = `${preferredCurrency} ${Number(amount).toFixed(2)}`;
+        if (item.deliveryAccuracy === "free") return "Free";
+        return item.deliveryAccuracy === "estimated" ? `Est. ${price}` : price;
+      }
+      if (item.deliveryAccuracy === "free" || (isMoneyValue(item.deliveryCost) && Number(item.deliveryCost) === 0)) return "Free";
+      if (item.deliveryDisplay) return item.deliveryAccuracy === "estimated" ? `Est. ${item.deliveryDisplay}` : item.deliveryDisplay;
+      return "Pending address";
+    }
+
+    function formatDeliveredPrice(item) {
+      const preferredCurrency = String(item.budgetCurrency || state.vaultMeta?.settings?.currency || deviceCurrency()).toUpperCase();
+      const amount = item.deliveredConvertedPrices?.[preferredCurrency] ?? item.deliveredBudgetAmount;
+      return isMoneyValue(amount) ? `${preferredCurrency} ${Number(amount).toFixed(2)}` : formatPrice(item);
     }
 
     function inferCurrency(value) {
@@ -1391,7 +1481,7 @@
 
     function rangeStatus(album) {
       const currency = String(album.budgetCurrency || state.vaultMeta?.settings?.currency || deviceCurrency()).toUpperCase();
-      const price = parsePrice(album.convertedPrices?.[currency] ?? album.budgetAmount ?? album.audPrice ?? album.currentCost ?? album.price ?? album.lowestPrice);
+      const price = parsePrice(album.deliveredConvertedPrices?.[currency] ?? album.deliveredBudgetAmount ?? album.convertedPrices?.[currency] ?? album.budgetAmount ?? album.audPrice ?? album.currentCost ?? album.price ?? album.lowestPrice);
       if (price === null) return "unknown";
       const range = priceRange(album);
       if (range.min !== null && price < range.min) return "outside";
@@ -1409,6 +1499,12 @@
             currentCost: album.currentCost || album.price || album.lowestPrice,
             audPrice: album.audPrice,
             audDisplay: album.audDisplay,
+            deliveryCost: album.deliveryCost,
+            deliveryCurrency: album.deliveryCurrency,
+            deliveryDisplay: album.deliveryDisplay,
+            deliveryAccuracy: album.deliveryAccuracy,
+            deliveredBudgetAmount: album.deliveredBudgetAmount,
+            deliveredBudgetDisplay: album.deliveredBudgetDisplay,
             currency: album.currency,
             verifiedPurchase: album.verifiedPurchase,
             purchaseActionFound: album.purchaseActionFound,
@@ -1557,6 +1653,37 @@
       els.searchViewButton.classList.toggle("active", view === "search");
       els.healthViewButton.classList.toggle("active", view === "health");
       els.settingsViewButton.classList.toggle("active", view === "settings");
+      renderPageHeader();
+    }
+
+    function renderPageHeader() {
+      const settings = state.vaultMeta?.settings || {};
+      const headings = {
+        home: ["Local collection intelligence", "Available physical releases"],
+        search: ["Your digital library", "The collection shelf"],
+        health: ["Local service status", "System health"],
+        settings: ["Private on this device", "Vault settings"]
+      };
+      const [eyebrow, heading] = headings[state.view] || headings.home;
+      els.pageEyebrow.textContent = eyebrow;
+      els.pageHeading.textContent = heading;
+      if (state.view === "search") {
+        els.dashboardSubtitle.textContent = "Newest additions first · open a cover to manage it";
+        return;
+      }
+      if (state.view === "health") {
+        els.dashboardSubtitle.textContent = "Sync, search, verification, and service status";
+        return;
+      }
+      if (state.view === "settings") {
+        els.dashboardSubtitle.textContent = "Preferences remain in local application data";
+        return;
+      }
+      const marketScope = settings.marketScope || "worldwide";
+      const country = els.marketCountry?.options[els.marketCountry.selectedIndex]?.text || "your country";
+      const region = els.marketRegion?.options[els.marketRegion.selectedIndex]?.text || "your region";
+      const marketName = marketScope === "worldwide" ? "Worldwide sellers" : marketScope === "country" ? `${country} sellers` : `${region} sellers`;
+      els.dashboardSubtitle.textContent = `${marketName} · delivered to ${country} · ${settings.currency || deviceCurrency()}`;
     }
 
     function artworkInitials(album) {
@@ -1590,7 +1717,7 @@
       const title = activeAlbum?.album || latest?.album || "Your physical collection starts here";
       const artist = activeAlbum?.artist || latest?.artist || "Mark albums Wanted, choose a priority, then run the search queue.";
       const label = activeAlbum ? "Scanning now" : latest ? "Latest verified match" : scanner.running ? "Preparing next album" : "Ready to discover";
-      const price = !showingActiveScan && latest ? formatPrice(latest) : "";
+      const price = !showingActiveScan && latest ? formatDeliveredPrice(latest) : "";
       const sellerUrl = !showingActiveScan && latest ? listingUrl(latest) : "";
       const statusText = scanner.running
         ? `${Number(progress.completed || 0)} of ${Number(progress.total || 0)} in this batch`
@@ -1653,48 +1780,25 @@
       els.albumGrid.innerHTML = albums.map(album => {
         const listings = getVerifiedListings(album);
         const primaryListing = listings[0];
-        const primaryListingUrl = primaryListing ? listingUrl(primaryListing) : "";
-        const latestPrice = primaryListing ? formatPrice(primaryListing) : formatPrice(album);
+        const deliveredPrice = primaryListing ? formatDeliveredPrice(primaryListing) : "";
         const currentStatus = albumStatus(album);
+        const added = album.dateAdded ? new Date(album.dateAdded) : null;
+        const addedLabel = added && Number.isFinite(added.getTime()) ? added.toLocaleDateString(undefined, { month: "short", year: "numeric" }) : "In collection";
         return `
-        <article class="album">
-          ${artworkMarkup(album)}
-          <div class="album-body">
-            <div class="album-summary">
-              <h3>${escapeHtml(album.album)}</h3>
-              <p class="subtle">${escapeHtml(album.artist)}</p>
-              <div class="meta">
-                <span class="pill ${escapeHtml(currentStatus)}">${escapeHtml(statusLabel(currentStatus))}</span>
-                <span class="pill">Priority ${escapeHtml(String(albumPriority(album)))}</span>
-                ${album.missing ? `<span class="pill excluded">Missing locally</span>` : ""}
-              </div>
+        <article class="shelf-slot">
+          <button class="shelf-album" type="button" data-action="edit" data-id="${escapeAttribute(album.id)}" data-album-tile="${escapeAttribute(album.id)}" title="Open ${escapeAttribute(album.album)} by ${escapeAttribute(album.artist)}">
+            <div class="shelf-cover-frame">
+              ${artworkMarkup(album)}
+              <span class="shelf-status ${escapeHtml(currentStatus)}" aria-label="${escapeAttribute(statusLabel(currentStatus))}"></span>
+              <span class="shelf-priority" aria-label="Priority ${escapeAttribute(String(albumPriority(album)))}">${escapeHtml(String(albumPriority(album)))}</span>
+              ${listings.length ? `<span class="shelf-live">${listings.length} live</span>` : ""}
             </div>
-            <div class="album-meta">
-              <div class="meta">
-                ${album.year ? `<span>${escapeHtml(album.year)}</span>` : ""}
-                ${album.genre ? `<span>${escapeHtml(album.genre)}</span>` : ""}
-                <span class="pill">${escapeHtml(album.format)}</span>
-                ${listings.length ? `<span class="pill available">${listings.length} live</span>` : ""}
-                ${latestPrice ? `<span class="pill available">${escapeHtml(latestPrice)}</span>` : ""}
-              </div>
-              <p class="subtle">${escapeHtml(priceRangeLabel(album))}</p>
-            </div>
-            <div class="album-controls">
-              <div class="links">
-                ${primaryListingUrl ? `<a class="mini-button" href="${escapeAttribute(primaryListingUrl)}" target="_blank" rel="noopener">Open latest seller</a>` : ""}
-                ${purchaseLinks(album).map(([label, url]) => `<a class="mini-button" href="${url}" target="_blank" rel="noopener">${label} search</a>`).join("")}
-              </div>
-              <div class="card-actions" aria-label="Collection status for ${escapeAttribute(album.album)}">
-                <button class="mini-button ${currentStatus === "wanted" ? "selected" : ""}" type="button" data-action="wanted" data-id="${escapeAttribute(album.id)}" aria-pressed="${currentStatus === "wanted"}">Wanted</button>
-                <button class="mini-button ${currentStatus === "owned" ? "selected" : ""}" type="button" data-action="owned" data-id="${escapeAttribute(album.id)}" aria-pressed="${currentStatus === "owned"}">Owned</button>
-                <button class="mini-button ${currentStatus === "excluded" ? "selected" : ""}" type="button" data-action="excluded" data-id="${escapeAttribute(album.id)}" aria-pressed="${currentStatus === "excluded"}">Not Interested</button>
-                <select data-action="priority" data-id="${escapeAttribute(album.id)}" aria-label="Priority for ${escapeAttribute(album.album)}">
-                  ${[5, 4, 3, 2, 1].map(priority => `<option value="${priority}" ${albumPriority(album) === priority ? "selected" : ""}>Priority ${priority}</option>`).join("")}
-                </select>
-                <button type="button" data-action="edit" data-id="${escapeAttribute(album.id)}" title="Edit album details">Edit</button>
-              </div>
-            </div>
-          </div>
+            <span class="shelf-caption">
+              <strong>${escapeHtml(album.album)}</strong>
+              <span>${escapeHtml(album.artist)}</span>
+              <small>${escapeHtml((album.format || "cd").toUpperCase())}${deliveredPrice ? ` · ${escapeHtml(deliveredPrice)} delivered` : ` · ${escapeHtml(addedLabel)}`}</small>
+            </span>
+          </button>
         </article>
       `;
       }).join("");
@@ -1712,12 +1816,12 @@
       const summaryHtml = `<div class="notice"><div><strong>${totalAvailable} verified available listings in total</strong><span class="subtle">Successful Matches Today shows previously unseen seller links. Top 100 ranks current results by priority.</span></div></div>`;
       const inRangeHtml = available.map(listing => {
         const url = listingUrl(listing);
-        const price = formatPrice(listing);
+        const price = formatDeliveredPrice(listing);
         return `
           <div class="notice">
             <div>
               <strong>${escapeHtml(listing.album)}</strong>
-              <span class="subtle">${escapeHtml(listing.artist)} is available on ${escapeHtml(listing.format || "the selected format")}${price ? ` at ${escapeHtml(price)}` : ""}. ${escapeHtml(priceRangeLabel(listing))}.</span>
+              <span class="subtle">${escapeHtml(listing.artist)} is available on ${escapeHtml(listing.format || "the selected format")}${price ? ` at ${escapeHtml(price)} delivered` : ""}. ${escapeHtml(priceRangeLabel(listing))}.</span>
             </div>
             <a class="mini-button" href="${escapeAttribute(url)}" target="_blank" rel="noopener">Open Link</a>
           </div>
@@ -1725,12 +1829,12 @@
       }).join("");
       const outsideHtml = outsideRange.map(listing => {
         const url = listingUrl(listing);
-        const price = formatPrice(listing);
+        const price = formatDeliveredPrice(listing);
         return `
           <div class="notice out-of-range">
             <div>
               <strong>${escapeHtml(listing.album)}</strong>
-              <span class="subtle">${escapeHtml(listing.artist)} is available at ${escapeHtml(price)}, outside ${escapeHtml(priceRangeLabel(listing))}.</span>
+              <span class="subtle">${escapeHtml(listing.artist)} is available at ${escapeHtml(price)} delivered, outside ${escapeHtml(priceRangeLabel(listing))}.</span>
             </div>
             <a class="mini-button" href="${escapeAttribute(url)}" target="_blank" rel="noopener">View Anyway</a>
           </div>
@@ -1771,8 +1875,11 @@
               <th>#</th>
               <th>Album</th>
               <th>Band</th>
+              <th>Format</th>
               <th>Priority</th>
-              <th>Price</th>
+              <th>Item</th>
+              <th>Delivery</th>
+              <th>Total</th>
               <th>Latest Listing</th>
               <th>Cross-Check</th>
             </tr>
@@ -1781,6 +1888,8 @@
             ${listings.map((listing, index) => {
               const url = listingUrl(listing);
               const price = formatPrice(listing) || "Unknown";
+              const delivery = formatDeliveryPrice(listing);
+              const total = formatDeliveredPrice(listing) || price;
               const source = listing.marketplace || listing.host || listing.seller || "Listing";
               const when = listing.lastVerifiedAt || listing.listingFoundAt || listing.availableAt || listing.lastChecked || "";
               const albumRecord = state.albums.find(album => album.id === listing.albumId) || listing;
@@ -1798,8 +1907,11 @@
                   <td class="rank" data-label="Rank">${index + 1}</td>
                   <td class="table-title" data-label="Album">${escapeHtml(listing.album)}</td>
                   <td data-label="Artist">${escapeHtml(listing.artist)}</td>
+                  <td data-label="Format">${escapeHtml(String(listing.format || "cd").toUpperCase())}</td>
                   <td data-label="Priority">${escapeHtml(String(listing.priority || 3))}</td>
-                  <td class="price" data-label="Price">${escapeHtml(price)}</td>
+                  <td data-label="Item">${escapeHtml(price)}</td>
+                  <td data-label="Delivery">${escapeHtml(delivery)}</td>
+                  <td class="price" data-label="Total">${escapeHtml(total)}</td>
                   <td data-label="Seller"><a class="mini-button" href="${escapeAttribute(url)}" target="_blank" rel="noopener">${escapeHtml(source)}</a>${when ? `<span class="subtle"> ${escapeHtml(new Date(when).toLocaleString())}</span>` : ""}</td>
                   <td data-label="Verified by">${identity}</td>
                 </tr>
@@ -1916,6 +2028,11 @@
       els.searchProvider.value = settings.searchProvider || "duckduckgo";
       els.searxngUrl.value = settings.searxngUrl || "";
       els.searxngUrl.disabled = els.searchProvider.value !== "searxng";
+      els.marketScope.value = settings.marketScope || "worldwide";
+      els.marketCountry.value = settings.marketCountry || "US";
+      els.marketRegion.value = settings.marketRegion || "north-america";
+      els.marketCountry.disabled = els.marketScope.value === "region";
+      els.marketRegion.disabled = els.marketScope.value !== "region";
       els.timeZoneValue.textContent = settings.timeZone || deviceTimeZone();
       const folderName = settings.libraryFolderName || "Music";
       els.libraryFolderStatus.textContent = settings.libraryFolderAvailable
@@ -1924,7 +2041,7 @@
       els.libraryFolderPath.disabled = settings.libraryFolderLocked === true || !state.serverMode;
       els.saveLibraryFolderButton.disabled = settings.libraryFolderLocked === true || !state.serverMode;
       els.libraryFolderPath.placeholder = settings.libraryFolderLocked === true ? "Controlled by MUSIC_ROOT" : "C:\\Music";
-      els.dashboardSubtitle.textContent = `Live library sync · ${settings.timeZone || deviceTimeZone()} · ${settings.currency || deviceCurrency()}`;
+      renderPageHeader();
       els.selectDailyScanButton.disabled = !state.serverMode;
       els.scanSelectedBatchButton.disabled = !state.serverMode || scanner.running || !planInfo.pending || !planInfo.requestsRemaining;
 
@@ -2056,23 +2173,60 @@
       }, 3000);
     }
 
-    function openEditor(album = null) {
+    function setEditorChoice(group, value) {
+      const input = group === "status" ? els.editStatus : els.editFormat;
+      input.value = value;
+      els.dialog.querySelectorAll(`[data-editor-group="${group}"] button`).forEach(button => {
+        const selected = button.dataset.value === value;
+        button.classList.toggle("selected", selected);
+        button.setAttribute("aria-pressed", String(selected));
+      });
+    }
+
+    function renderDialogListings(album) {
+      if (!album) {
+        els.dialogListings.innerHTML = `<p class="subtle">Artwork and verified seller results will appear here.</p>`;
+        return;
+      }
+      const listings = getVerifiedListings(album).slice(0, 4);
+      if (!listings.length) {
+        els.dialogListings.innerHTML = `<div class="dialog-listing-empty"><strong>No live seller yet</strong><span>Wanted albums enter the next scan.</span></div>`;
+        return;
+      }
+      els.dialogListings.innerHTML = `
+        <span class="label">Verified sellers</span>
+        ${listings.map(listing => `
+          <a class="dialog-listing" href="${escapeAttribute(listingUrl(listing))}" target="_blank" rel="noopener">
+            <span><strong>${escapeHtml(listing.marketplace || listing.host || "Seller")}</strong><small>${escapeHtml(formatPrice(listing))} + ${escapeHtml(formatDeliveryPrice(listing))}</small></span>
+            <b>${escapeHtml(formatDeliveredPrice(listing))}</b>
+          </a>`).join("")}`;
+    }
+
+    function openEditor(album = null, trigger = null) {
+      state.dialogReturn = {
+        albumId: album?.id || "",
+        scrollY: window.scrollY,
+        trigger
+      };
       els.dialogTitle.textContent = album ? "Edit Album" : "Add Album";
+      els.dialogEyebrow.textContent = album ? `${String(album.format || "cd").toUpperCase()} · Priority ${albumPriority(album)}` : "New collection record";
       els.editId.value = album?.id || "";
       els.editAlbum.value = album?.album || "";
       els.editArtist.value = album?.artist || "";
       els.editYear.value = album?.year || "";
       els.editGenre.value = album?.genre || "";
-      els.editStatus.value = album ? albumStatus(album) : "wanted";
+      setEditorChoice("status", album ? albumStatus(album) : "wanted");
       els.editPriority.value = String(album ? albumPriority(album) : 3);
-      els.editFormat.value = album?.format || "cd";
+      setEditorChoice("format", ["cd", "vinyl", "cassette"].includes(album?.format) ? album.format : "cd");
       els.editCurrentCost.value = album?.currentCost || album?.price || "";
       els.editMinPrice.value = album?.minPrice || album?.priceMin || "";
       els.editMaxPrice.value = album?.maxPrice || album?.priceMax || album?.targetPrice || "";
       els.editBudgetCurrency.value = album?.budgetCurrency || state.vaultMeta?.settings?.currency || deviceCurrency();
       els.editPurchaseUrl.value = album?.purchaseUrl || "";
       els.editNotes.value = album?.notes || "";
-      els.deleteAlbumButton.hidden = !album || album.source === "apple-music-folder";
+      els.deleteAlbumButton.hidden = !album || album.source === "music-folder";
+      els.dialogArtwork.innerHTML = artworkMarkup(album || { album: "New", artist: "Album" });
+      renderDialogListings(album);
       els.dialog.showModal();
     }
 
@@ -2185,6 +2339,12 @@
           currency: bestListing.originalCurrency || update.currency || existing.currency,
           audPrice: bestListing.audPrice || update.audPrice || existing.audPrice,
           audDisplay: bestListing.audDisplay || update.audDisplay || existing.audDisplay,
+          deliveryCost: bestListing.deliveryCost ?? update.deliveryCost ?? existing.deliveryCost,
+          deliveryCurrency: bestListing.deliveryCurrency || update.deliveryCurrency || existing.deliveryCurrency,
+          deliveryDisplay: bestListing.deliveryDisplay || update.deliveryDisplay || existing.deliveryDisplay,
+          deliveryAccuracy: bestListing.deliveryAccuracy || update.deliveryAccuracy || existing.deliveryAccuracy,
+          deliveredBudgetAmount: bestListing.deliveredBudgetAmount ?? update.deliveredBudgetAmount ?? existing.deliveredBudgetAmount,
+          deliveredBudgetDisplay: bestListing.deliveredBudgetDisplay || update.deliveredBudgetDisplay || existing.deliveredBudgetDisplay,
           marketplace: bestListing.marketplace || update.marketplace || update.source || existing.marketplace,
           seller: update.seller || existing.seller,
           verifiedPurchase: importedAvailable || existing.verifiedPurchase === true,
@@ -2206,6 +2366,10 @@
     }
 
     async function updateAutomationSetting(enabled) {
+      if (enabled && !window.confirm("Enable web scanning? Artist and album search terms will be sent to the selected search provider, and matching seller pages will be visited.")) {
+        els.automationToggle.checked = false;
+        return;
+      }
       if (!state.serverMode) {
         els.automationToggle.checked = true;
         showToast("Settings require the local dashboard server.");
@@ -2264,11 +2428,19 @@
         return;
       }
       els.saveSearchSettingsButton.disabled = true;
+      els.saveMarketSettingsButton.disabled = true;
       try {
         const response = await fetch("/api/settings", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ searchProvider, searxngUrl, timeZone: deviceTimeZone() })
+          body: JSON.stringify({
+            searchProvider,
+            searxngUrl,
+            timeZone: deviceTimeZone(),
+            marketScope: els.marketScope.value,
+            marketCountry: els.marketCountry.value,
+            marketRegion: els.marketRegion.value
+          })
         });
         if (!response.ok) throw new Error("Search settings could not be saved");
         const settings = await response.json();
@@ -2279,6 +2451,7 @@
         showToast(error.message || "Search settings could not be saved.");
       } finally {
         els.saveSearchSettingsButton.disabled = false;
+        els.saveMarketSettingsButton.disabled = false;
       }
     }
 
@@ -2376,7 +2549,12 @@
     els.searchProvider.addEventListener("change", () => {
       els.searxngUrl.disabled = els.searchProvider.value !== "searxng";
     });
+    els.marketScope.addEventListener("change", () => {
+      els.marketCountry.disabled = els.marketScope.value === "region";
+      els.marketRegion.disabled = els.marketScope.value !== "region";
+    });
     els.saveSearchSettingsButton.addEventListener("click", saveSearchSettings);
+    els.saveMarketSettingsButton.addEventListener("click", saveSearchSettings);
     els.saveLibraryFolderButton.addEventListener("click", saveLibraryFolder);
     els.selectDailyScanButton.addEventListener("click", () => selectDailyScanPlan(false));
     els.scanSelectedBatchButton.addEventListener("click", refreshAvailability);
@@ -2413,7 +2591,7 @@
       const album = state.albums.find(item => item.id === button.dataset.id);
       if (!album) return;
       if (button.dataset.action === "edit") {
-        openEditor(album);
+        openEditor(album, button);
         return;
       }
       const previousStatus = album.status;
@@ -2465,6 +2643,29 @@
         return;
       }
       if (await saveFromEditor()) els.dialog.close();
+    });
+
+    els.dialog.addEventListener("click", event => {
+      const choice = event.target.closest("[data-editor-group] button[data-value]");
+      if (choice) {
+        const group = choice.closest("[data-editor-group]").dataset.editorGroup;
+        setEditorChoice(group, choice.dataset.value);
+        return;
+      }
+      if (event.target === els.dialog) els.dialog.close();
+    });
+
+    els.dialog.addEventListener("close", () => {
+      const returnState = state.dialogReturn;
+      if (!returnState) return;
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: returnState.scrollY, left: 0, behavior: "instant" });
+        const tile = returnState.albumId
+          ? document.querySelector(`[data-album-tile="${CSS.escape(returnState.albumId)}"]`)
+          : returnState.trigger;
+        tile?.focus({ preventScroll: true });
+        state.dialogReturn = null;
+      });
     });
 
     render();

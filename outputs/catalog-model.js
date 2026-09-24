@@ -5,6 +5,7 @@ const STATUSES = Object.freeze({
 });
 
 const CURRENCIES = Object.freeze(["AUD", "USD", "GBP", "EUR"]);
+const FORMATS = Object.freeze(["cd", "vinyl", "cassette"]);
 
 const DIGITAL_ONLY_HOSTS = Object.freeze([
   "7digital.com",
@@ -52,6 +53,14 @@ function normaliseCurrency(value, fallback = "AUD") {
   return CURRENCIES.includes(currency) ? currency : fallback;
 }
 
+function normaliseFormat(value, fallback = "cd") {
+  const format = String(value || "").trim().toLowerCase();
+  if (format === "compact disc") return "cd";
+  if (["lp", "record"].includes(format)) return "vinyl";
+  if (format === "tape") return "cassette";
+  return FORMATS.includes(format) ? format : fallback;
+}
+
 function parseMoney(value) {
   if (value === null || value === undefined || value === "") return null;
   const match = String(value).replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
@@ -78,7 +87,7 @@ function normaliseAlbum(album = {}) {
     ...album,
     status,
     priority: legacyMostWanted ? 5 : albumPriority(album),
-    format: String(album.format || "cd").trim().toLowerCase(),
+    format: normaliseFormat(album.format),
     budgetCurrency: normaliseCurrency(album.budgetCurrency || album.priceCurrency || album.currency || "AUD"),
     minPrice: parseMoney(album.minPrice ?? album.priceMin),
     maxPrice: parseMoney(album.maxPrice ?? album.priceMax ?? album.targetPrice)
@@ -119,6 +128,7 @@ function compareAvailableAlbums(a, b) {
 module.exports = {
   CURRENCIES,
   DIGITAL_ONLY_HOSTS,
+  FORMATS,
   STATUSES,
   albumPriority,
   albumStatus,
@@ -131,6 +141,7 @@ module.exports = {
   listingTimestamp,
   normaliseAlbum,
   normaliseCurrency,
+  normaliseFormat,
   normaliseStatus,
   parseMoney
 };

@@ -1,5 +1,25 @@
 # Changelog
 
+## 3.2.0 - 2026-09-24
+
+### Added
+
+- Artwork-first music shelf with a centred album workspace that returns to the same shelf position.
+- Explicit CD, vinyl, and cassette targets for each album.
+- Worldwide, country, and regional seller-market controls with a configurable delivery destination.
+- Seller-page shipping extraction, clearly labelled delivery estimates, and delivered-price totals.
+
+### Changed
+
+- Collection order defaults to newest added for a chronological browsing journey.
+- Price-range decisions now use delivered totals when shipping data is available.
+- Availability tables separate item price, delivery, and total cost.
+
+### Privacy
+
+- Market and delivery preferences remain in each user's ignored local settings file.
+- No local username, source path, catalogue, or runtime scan data is included in the release.
+
 ## 3.1.0 - 2026-09-24
 
 ### Added

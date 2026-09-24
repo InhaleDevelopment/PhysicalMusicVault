@@ -40,7 +40,10 @@ test("settings updates are allowlisted and bounded", () => {
     apiKey: "do-not-store",
     libraryRoot: "C:\\private-library",
     currency: "gbp",
-    timeZone: "Australia/Sydney"
+    timeZone: "Australia/Sydney",
+    marketScope: "region",
+    marketCountry: "au",
+    marketRegion: "oceania"
   });
 
   assert.deepEqual(update, {
@@ -48,7 +51,10 @@ test("settings updates are allowlisted and bounded", () => {
     scanLimit: 50,
     dailyScanLimit: 1,
     currency: "GBP",
-    timeZone: "Australia/Sydney"
+    timeZone: "Australia/Sydney",
+    marketScope: "region",
+    marketCountry: "AU",
+    marketRegion: "oceania"
   });
 });
 
