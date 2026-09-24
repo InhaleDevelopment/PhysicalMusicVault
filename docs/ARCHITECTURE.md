@@ -22,7 +22,7 @@ Physical Music Vault is intentionally local-first and dependency-light. A Node.j
 1. The sync worker reads the configured media folder and writes a temporary snapshot.
 2. The server merges that snapshot into the latest vault so status, priority, budgets, and live scan results cannot be overwritten by a concurrent sync.
 3. The daily planner selects only present Wanted albums, ordered by priority and least-recent scan. It records the active CD, vinyl, or cassette search while preserving daily request accounting when that format changes.
-4. The scanner emits an IPC result after every album. The server atomically merges it immediately, so the dashboard updates during a batch rather than after it.
+4. The scanner uses one CD query, combines and deduplicates `vinyl` plus `LP` queries for vinyl, or combines and deduplicates `tape` plus `cassette` queries for cassette. It emits an IPC result after every album, and the server atomically merges it immediately so the dashboard updates during a batch rather than after it.
 5. The public API strips local paths. Artwork is served only by album ID after validating that the resolved image remains inside that album's source folder.
 
 ## Listing Acceptance

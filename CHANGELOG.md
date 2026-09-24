@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.4.0 - 2026-09-24
+
+### Changed
+
+- Every Collection tile now permanently displays `Album - Artist` on the cover (for example, `Entity - 0`) instead of revealing metadata only on hover.
+- Vinyl scans combine separate `vinyl buy` and `LP buy` searches.
+- Cassette scans combine separate `tape buy` and `cassette buy` searches.
+- Multi-query results are merged and deduplicated before Discogs identity and seller-page verification.
+
 ## 3.3.0 - 2026-09-24
 
 ### Added

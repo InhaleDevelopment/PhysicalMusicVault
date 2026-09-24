@@ -7,10 +7,10 @@ Version 3 is a dependency-light Node.js application with no account, cloud datab
 ## Product Flow
 
 1. Watch any configured `<Artist>/<Album>` music folder for changes and reconcile it every 10 minutes, or import a CSV/JSON catalogue.
-2. Browse an artwork-first chronological shelf and open any cover into a focused album workspace.
+2. Browse a chronological shelf where every cover permanently displays `Album - Artist`, then open any title into a focused album workspace.
 3. Keep catalogue status separate from a 1-5 purchase priority and per-album delivered-price range.
 4. Select up to 500 Wanted albums per local calendar day, highest priority first.
-5. Choose CD, vinyl, or cassette when starting a search. The query becomes `Artist - Album cd buy`, `Artist - Album vinyl buy`, or `Artist - Album cassette OR tape buy`, optionally narrowed to a country or region.
+5. Choose CD, vinyl, or cassette when starting a search. CD uses `Artist - Album cd buy`; vinyl combines `Artist - Album vinyl buy` with `Artist - Album LP buy`; cassette combines `Artist - Album tape buy` with `Artist - Album cassette buy`. Country and region suffixes remain optional.
 6. Cross-check the artist and release against Discogs across every genre.
 7. Accept a result only when the direct seller page proves the artist, album, selected format, numeric price, active purchase control, and any requested market restriction.
 8. Extract a seller shipping rate where published; otherwise show a format- and distance-based estimate and keep it visibly labelled.

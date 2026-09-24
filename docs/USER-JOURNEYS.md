@@ -12,7 +12,7 @@ These are the release acceptance journeys for Physical Music Vault.
 ## Build The Watchlist
 
 1. The Collection view combines the configured folder, imported catalogues, and manual entries, with local cover artwork when available.
-2. The chronological collection is presented as physical cover artwork placed on tactile shelf rows; search and status controls narrow large libraries without rendering the whole catalogue at once.
+2. The chronological collection is presented as physical cover artwork placed on tactile shelf rows. Every tile permanently displays `Album - Artist`; search and status controls narrow large libraries without rendering the whole catalogue at once.
 3. Selecting a cover opens the album in the centre of the screen; closing it restores the exact shelf position.
 4. Wanted enters search selection; Owned and Not Interested stay out.
 5. Priority 1-5 controls queue order. Priority 5 is the highest.
@@ -22,7 +22,7 @@ These are the release acceptance journeys for Physical Music Vault.
 ## Find A Physical Release
 
 1. The user selects Today's 500 or clicks Search wanted albums.
-2. A focused launcher asks for CD, vinyl, or cassette and previews the exact query pattern.
+2. A focused launcher asks for CD, vinyl, or cassette and previews every exact query. CD runs one `cd` search; vinyl combines separate `vinyl` and `LP` searches; cassette combines separate `tape` and `cassette` searches.
 3. Up to 500 Wanted albums enter the local-day queue, priority 5 first; switching format prepares new pending searches without resetting requests already used that day.
 4. The next batch starts without holding the browser request open.
 5. The live banner shows the album currently being checked.

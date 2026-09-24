@@ -992,7 +992,7 @@
           <strong>Cassette</strong>
         </button>
       </div>
-      <div class="query-preview"><span>Search pattern</span><code id="scanQueryPreview">Artist - Album cd buy</code></div>
+      <div class="query-preview"><span id="scanQueryLabel">Search pattern</span><code id="scanQueryPreview">Artist - Album cd buy</code></div>
       <div class="row scan-actions">
         <button value="cancel" type="submit" formnovalidate>Cancel</button>
         <button id="startScanButton" class="primary grow" value="default" type="submit">Search next 25</button>
@@ -1107,6 +1107,7 @@
       scanDialog: document.getElementById("scanDialog"),
       scanForm: document.getElementById("scanForm"),
       scanFormat: document.getElementById("scanFormat"),
+      scanQueryLabel: document.getElementById("scanQueryLabel"),
       scanQueryPreview: document.getElementById("scanQueryPreview"),
       startScanButton: document.getElementById("startScanButton")
     };
@@ -1403,13 +1404,21 @@
         });
     }
 
+    function scanSearchQueries(format, artist = "Artist", album = "Album") {
+      const selectedFormat = ["cd", "vinyl", "cassette"].includes(format) ? format : "cd";
+      const terms = selectedFormat === "vinyl"
+        ? ["vinyl", "LP"]
+        : selectedFormat === "cassette"
+          ? ["tape", "cassette"]
+          : ["cd"];
+      return terms.map(term => `${artist} - ${album} ${term} buy`);
+    }
+
     function purchaseLinks(album) {
-      const format = ["cd", "vinyl", "cassette"].includes(state.scanFormat) ? state.scanFormat : "cd";
-      const terms = format === "cassette" ? "cassette OR tape" : format;
-      const googleQuery = encodeURIComponent(`${album.artist} - ${album.album} ${terms} buy`);
-      return [
-        ["Google", `https://www.google.com/search?q=${googleQuery}`]
-      ];
+      return scanSearchQueries(state.scanFormat, album.artist, album.album).map((query, index) => [
+        index === 0 ? "Google" : "Google alternative",
+        `https://www.google.com/search?q=${encodeURIComponent(query)}`
+      ]);
     }
 
     function listingUrl(item) {
@@ -1778,16 +1787,18 @@
     function shelfTile(album) {
       const listings = getVerifiedListings(album);
       const currentStatus = albumStatus(album);
-      const label = `${album.album} by ${album.artist}. ${statusLabel(currentStatus)}, priority ${albumPriority(album)}${listings.length ? `, ${listings.length} live listing${listings.length === 1 ? "" : "s"}` : ""}. Open details.`;
+      const tileTitle = `${album.album} - ${album.artist}`;
+      const titleDensity = tileTitle.length > 56 ? " dense" : tileTitle.length > 34 ? " compact" : "";
+      const label = `${tileTitle}. ${statusLabel(currentStatus)}, priority ${albumPriority(album)}${listings.length ? `, ${listings.length} live listing${listings.length === 1 ? "" : "s"}` : ""}. Open details.`;
       return `
         <article class="shelf-slot">
-          <button class="shelf-album" type="button" data-action="edit" data-id="${escapeAttribute(album.id)}" data-album-tile="${escapeAttribute(album.id)}" aria-label="${escapeAttribute(label)}" title="${escapeAttribute(album.album)} · ${escapeAttribute(album.artist)}">
+          <button class="shelf-album" type="button" data-action="edit" data-id="${escapeAttribute(album.id)}" data-album-tile="${escapeAttribute(album.id)}" aria-label="${escapeAttribute(label)}" title="${escapeAttribute(tileTitle)}">
             <div class="shelf-cover-frame">
               ${artworkMarkup(album)}
               <span class="shelf-status ${escapeHtml(currentStatus)}" aria-label="${escapeAttribute(statusLabel(currentStatus))}"></span>
               <span class="shelf-priority" aria-label="Priority ${escapeAttribute(String(albumPriority(album)))}">${escapeHtml(String(albumPriority(album)))}</span>
               ${listings.length ? `<span class="shelf-live" aria-label="${listings.length} live listings">${listings.length}</span>` : ""}
-              <span class="shelf-peek" aria-hidden="true"><strong>${escapeHtml(album.album)}</strong><span>${escapeHtml(album.artist)}</span></span>
+              <span class="shelf-label${titleDensity}" aria-hidden="true">${escapeHtml(tileTitle)}</span>
             </div>
           </button>
         </article>`;
@@ -2158,10 +2169,11 @@
 
     function setScanFormat(value) {
       const format = normaliseScanFormat(value);
-      const terms = format === "cassette" ? "cassette OR tape" : format;
+      const queries = scanSearchQueries(format);
       state.scanFormat = format;
       els.scanFormat.value = format;
-      els.scanQueryPreview.textContent = `Artist - Album ${terms} buy`;
+      els.scanQueryLabel.textContent = queries.length === 1 ? "Search pattern" : "Search patterns";
+      els.scanQueryPreview.textContent = queries.join("\n");
       els.scanDialog.querySelectorAll("[data-scan-format]").forEach(button => {
         const selected = button.dataset.scanFormat === format;
         button.classList.toggle("selected", selected);

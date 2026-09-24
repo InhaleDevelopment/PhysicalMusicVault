@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
+  googleQueries,
   googleQuery,
   deliveryEvidence,
   hasPhysicalFormat,
@@ -9,17 +10,32 @@ const {
   identityVerification,
   parsePrice,
   marketEligibility,
+  mergeSearchResults,
   productPageEvidence
 } = require("../outputs/availability-scanner");
 
 test("uses the exact required Google query", () => {
   assert.equal(googleQuery({ artist: "Acherontas", album: "Ta Tvam Asi (Universal Omniscience)" }), "Acherontas - Ta Tvam Asi (Universal Omniscience) cd buy");
-  assert.equal(googleQuery({ artist: "Acherontas", album: "Ta Tvam Asi" }, { searchFormat: "vinyl" }), "Acherontas - Ta Tvam Asi vinyl buy");
-  assert.equal(googleQuery({ artist: "Acherontas", album: "Ta Tvam Asi" }, { searchFormat: "cassette" }), "Acherontas - Ta Tvam Asi cassette OR tape buy");
+  assert.deepEqual(
+    googleQueries({ artist: "Acherontas", album: "Ta Tvam Asi" }, { searchFormat: "vinyl" }),
+    ["Acherontas - Ta Tvam Asi vinyl buy", "Acherontas - Ta Tvam Asi LP buy"]
+  );
+  assert.deepEqual(
+    googleQueries({ artist: "Acherontas", album: "Ta Tvam Asi" }, { searchFormat: "cassette" }),
+    ["Acherontas - Ta Tvam Asi tape buy", "Acherontas - Ta Tvam Asi cassette buy"]
+  );
   assert.equal(
     googleQuery({ artist: "Acherontas", album: "Ta Tvam Asi" }, { searchFormat: "cd", marketScope: "country", marketCountry: "AU" }),
     "Acherontas - Ta Tvam Asi cd buy Australia"
   );
+});
+
+test("combines format searches without duplicating seller URLs", () => {
+  const shared = { url: "https://shop.example/release", title: "Vinyl edition" };
+  assert.deepEqual(mergeSearchResults([
+    { results: [shared, { url: "https://first.example/release" }] },
+    { results: [{ ...shared, title: "LP edition" }, { url: "https://second.example/release" }] }
+  ]), [shared, { url: "https://first.example/release" }, { url: "https://second.example/release" }]);
 });
 
 test("extracts website shipping rates and confirms the selected market", () => {

@@ -59,7 +59,10 @@ test("collection is an interactive shelf with centred detail controls", () => {
   assert.match(html, /data-album-tile=/);
   assert.match(html, /class="album-detail-layout"/);
   assert.match(css, /url\("assets\/music-shelf\.png"\)/);
-  assert.match(css, /\.shelf-peek/);
+  assert.match(html, /class="shelf-label/);
+  assert.match(html, /const tileTitle = `\$\{album\.album\} - \$\{album\.artist\}`/);
+  assert.match(css, /\.shelf-label/);
+  assert.doesNotMatch(css, /\.shelf-peek/);
   assert.doesNotMatch(html, /id="formatFilter"/);
   assert.doesNotMatch(html, /data-editor-group="format"/);
 });
@@ -67,7 +70,8 @@ test("collection is an interactive shelf with centred detail controls", () => {
 test("physical format is selected when a search starts", () => {
   for (const format of ["cd", "vinyl", "cassette"]) assert.match(html, new RegExp(`data-scan-format="${format}"`));
   assert.match(html, /Artist - Album cd buy/);
-  assert.match(html, /cassette OR tape/);
+  assert.match(html, /\["vinyl", "LP"\]/);
+  assert.match(html, /\["tape", "cassette"\]/);
   assert.match(html, /\/api\/scan\?limit=25&format=/);
 });
 

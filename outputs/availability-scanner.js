@@ -211,18 +211,32 @@ function marketPreference(settings = {}) {
   };
 }
 
-function googleQuery(album, settings = {}) {
+function googleQueries(album, settings = {}) {
   const format = normaliseFormat(settings.searchFormat || album.format || "cd");
-  const formatTerms = format === "cassette" ? "cassette OR tape" : format;
-  const base = `${cleanField(album.artist)} - ${cleanField(album.album)} ${formatTerms} buy`;
+  const formatTerms = format === "vinyl"
+    ? ["vinyl", "LP"]
+    : format === "cassette"
+      ? ["tape", "cassette"]
+      : ["cd"];
   const market = marketPreference(settings);
-  if (market.scope === "country") return `${base} ${market.countryName}`;
-  if (market.scope === "region") return `${base} ${market.regionName}`;
-  return base;
+  const marketSuffix = market.scope === "country"
+    ? ` ${market.countryName}`
+    : market.scope === "region"
+      ? ` ${market.regionName}`
+      : "";
+  return formatTerms.map(term => `${cleanField(album.artist)} - ${cleanField(album.album)} ${term} buy${marketSuffix}`);
+}
+
+function googleQuery(album, settings = {}) {
+  return googleQueries(album, settings)[0];
 }
 
 function googleSearchUrl(album, settings = {}) {
   return `https://www.google.com/search?q=${encodeURIComponent(googleQuery(album, settings))}`;
+}
+
+function googleSearchUrls(album, settings = {}) {
+  return googleQueries(album, settings).map(query => `https://www.google.com/search?q=${encodeURIComponent(query)}`);
 }
 
 function priceRecord(amount, currency, exchangeRatesToAud, budgetCurrency = "AUD") {
@@ -554,9 +568,35 @@ function identityVerification(album, discogsSearch) {
   };
 }
 
+function mergeSearchResults(searches = []) {
+  const resultsByUrl = new Map();
+  searches.forEach(search => {
+    (search.results || []).forEach(result => {
+      if (result?.url && !resultsByUrl.has(result.url)) resultsByUrl.set(result.url, result);
+    });
+  });
+  return [...resultsByUrl.values()];
+}
+
 async function discoverAlbum(album, settings) {
   const limit = Math.max(10, Math.min(50, Number(settings.searchResultLimit || 20)));
-  const primary = await searchWeb(googleQuery(album, settings), settings, { limit });
+  const searches = [];
+  const errors = [];
+  for (const query of googleQueries(album, settings)) {
+    try {
+      searches.push(await searchWeb(query, settings, { limit }));
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (!searches.length) throw errors[0] || new Error("Web search returned no responses.");
+  const primary = {
+    provider: searches[0].provider,
+    query: searches[0].query,
+    queries: searches.map(search => search.query),
+    results: mergeSearchResults(searches),
+    errors: errors.map(error => error.message)
+  };
   let discogsSearch = { provider: primary.provider, query: primary.query, results: primary.results };
   if (!findIdentityResult(primary.results, "discogs.com", album)) {
     const query = `site:discogs.com ${cleanField(album.artist)} - ${cleanField(album.album)}`;
@@ -658,7 +698,9 @@ async function scanAlbum(album, trustedVendors, settings) {
     lastChecked: new Date().toISOString(),
     searchOrder: ["Exact web query", "Discogs identity check", "Direct seller-page verification"],
     googleQuery: googleQuery(album, settings),
+    googleQueries: googleQueries(album, settings),
     googleSearchUrl: googleSearchUrl(album, settings),
+    googleSearchUrls: googleSearchUrls(album, settings),
     marketScope: marketPreference(settings).scope,
     marketLabel: marketPreference(settings).scope === "country" ? marketPreference(settings).countryName : marketPreference(settings).scope === "region" ? marketPreference(settings).regionName : "Worldwide",
     scanCompleted: true,
@@ -680,7 +722,7 @@ async function scanAlbum(album, trustedVendors, settings) {
   }
 
   update.searchProvider = discovery.primary.provider;
-  update.searchQueries = [discovery.primary.query, discovery.discogsSearch.query]
+  update.searchQueries = [...(discovery.primary.queries || [discovery.primary.query]), discovery.discogsSearch.query]
     .filter((query, index, values) => query && values.indexOf(query) === index);
   const discogs = identityVerification(album, discovery.discogsSearch);
   update.discogsVerificationUrl = discogs.url;
@@ -852,7 +894,9 @@ if (require.main === module) {
 }
 
 module.exports = {
+  googleQueries,
   googleQuery,
+  googleSearchUrls,
   googleSearchUrl,
   hasAlbumIdentity,
   hasPhysicalFormat,
@@ -863,6 +907,7 @@ module.exports = {
   deliveryEvidence,
   marketEligibility,
   marketPreference,
+  mergeSearchResults,
   productPageEvidence,
   resultMatchesAlbum,
   scanAlbum

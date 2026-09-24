@@ -630,28 +630,31 @@ textarea { min-height: 98px; resize: vertical; }
   min-height: 0;
   aspect-ratio: 1;
 }
+.shelf-cover-frame .album-cover > span { display: none; }
 
-.shelf-peek {
+.shelf-label {
   position: absolute;
+  z-index: 1;
   left: 0;
   right: 0;
   bottom: 0;
-  min-width: 0;
-  padding: 9px 10px;
-  display: grid;
-  gap: 1px;
-  background: rgba(10, 16, 14, 0.9);
+  min-height: 38px;
+  padding: 7px 34px 7px 9px;
+  display: -webkit-box;
+  overflow: hidden;
+  background: rgba(10, 16, 14, 0.92);
   color: #ffffff;
-  opacity: 0;
-  transform: translateY(100%);
-  transition: opacity 150ms ease, transform 150ms ease;
+  font-size: 0.68rem;
+  font-weight: 760;
+  line-height: 1.18;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
 }
-.shelf-album:hover .shelf-peek,
-.shelf-album:focus-visible .shelf-peek { opacity: 1; transform: translateY(0); }
-.shelf-peek strong,
-.shelf-peek span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.shelf-peek strong { font-size: 0.71rem; }
-.shelf-peek span { color: #cfd8d3; font-size: 0.63rem; }
+.shelf-label.compact { font-size: 0.62rem; }
+.shelf-label.dense { font-size: 0.56rem; line-height: 1.15; }
+.shelf-album:hover .shelf-label,
+.shelf-album:focus-visible .shelf-label { background: rgba(10, 16, 14, 0.98); }
 
 .shelf-status,
 .shelf-priority,
@@ -911,7 +914,7 @@ dialog::backdrop { background: rgba(9, 14, 12, 0.62); }
 .media-symbol-cassette::after { right: 8px; }
 .query-preview { padding: 12px 14px; border-left: 3px solid var(--signal); background: #f4f7f5; }
 .query-preview span { display: block; margin-bottom: 4px; color: var(--muted); font-size: 0.67rem; font-weight: 800; text-transform: uppercase; }
-.query-preview code { color: var(--green); font-size: 0.84rem; white-space: normal; }
+.query-preview code { display: block; color: var(--green); font-size: 0.84rem; line-height: 1.65; white-space: pre-line; }
 .scan-actions { justify-content: flex-end; }
 .detail-controls { padding-top: 2px; }
 .detail-notes { border-top: 1px solid var(--line); padding-top: 12px; }
