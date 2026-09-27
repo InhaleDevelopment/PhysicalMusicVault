@@ -12,6 +12,7 @@ Physical Music Vault is intentionally local-first and dependency-light. A Node.j
 | `web-search.js` | Free keyless search with optional self-hosted SearXNG support |
 | `scan-plan.js` | Local-day queue selection, priority ordering, request accounting, and retry state |
 | `catalog-model.js` | Catalogue invariants, money helpers, physical-source policy, and sorting |
+| `intelligence-model.js` | Bounded price observations, smart-collection rules, purchase records, and valuation helpers |
 | `vault-platform.js` | Atomic persistence, settings allowlist, artwork safety, and API response sanitisation |
 | `vault-agent.js` | Background server supervision and local health reporting |
 | `vault-toggle.js` | One-command Windows on/off lifecycle |
@@ -24,6 +25,7 @@ Physical Music Vault is intentionally local-first and dependency-light. A Node.j
 3. The daily planner selects only present Wanted albums, ordered by priority and least-recent scan. It records the active CD, vinyl, or cassette search while preserving daily request accounting when that format changes.
 4. The scanner uses one CD query, combines and deduplicates `vinyl` plus `LP` queries for vinyl, or combines and deduplicates `tape` plus `cassette` queries for cassette. It emits an IPC result after every album, and the server atomically merges it immediately so the dashboard updates during a batch rather than after it.
 5. The public API strips local paths. Artwork is served only by album ID after validating that the resolved image remains inside that album's source folder.
+6. Each verified listing contributes at most one unchanged price observation per seller per local day; an intraday price change is retained immediately. Smart collections evaluate current albums and listings in the browser, while their rules and the purchase ledger persist atomically in the vault.
 
 ## Listing Acceptance
 
@@ -51,4 +53,4 @@ The service binds to `127.0.0.1` by default. Private-LAN binding is explicit and
 
 ## Test Strategy
 
-`npm run verify` performs syntax checks and Node's test suite. Tests cover catalogue rules, daily planning, parsers, scanner evidence, sync reconciliation, public-data sanitisation, artwork containment, and a real temporary HTTP server journey. CI runs the same command on Windows with Node.js 20.
+`npm run verify` performs syntax checks and Node's test suite. Tests cover catalogue rules, price-history compaction, smart-rule and purchase validation, daily planning, parsers, scanner evidence, sync reconciliation, public-data sanitisation, artwork containment, intelligence CRUD, and a real temporary HTTP server journey. CI runs the same command on Windows with Node.js 20.

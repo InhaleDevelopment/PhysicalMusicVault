@@ -39,6 +39,16 @@ These are the release acceptance journeys for Physical Music Vault.
 5. In-range and out-of-range notices remain visually distinct.
 6. Site shipping rates, free delivery, and estimates are labelled distinctly; the seller's checkout remains final.
 
+## Use Intelligence
+
+1. Price History records accepted seller prices automatically and charts the lowest delivered price per local day in the user's device currency.
+2. Repeated unchanged observations are compacted to one seller price per day; a changed price is retained immediately.
+3. Smart Collections save reusable combinations of status, availability, minimum priority, physical format, album budget, maximum delivered price, and listing recency.
+4. Smart results update whenever the library, priorities, budgets, or verified listings change and can open the seller or begin a purchase record.
+5. The Purchase Ledger records album, format, seller, item and delivery cost, currency, date, condition, order status, link, and notes.
+6. Saving a purchase can mark its album Owned. The ledger converts paid totals into the device currency and compares them with the latest verified delivered price.
+7. Price observations, rules, and purchase records remain in private ignored vault data and are never committed to Git.
+
 ## Background Operation
 
 1. The library watcher reacts to folder changes; a ten-minute reconciliation covers missed events.
@@ -56,7 +66,7 @@ These are the release acceptance journeys for Physical Music Vault.
 
 ## Backup And Migration
 
-1. Settings provides CSV/JSON import, manual album entry, availability import, and vault export.
+1. Settings provides CSV/JSON import, manual album entry, availability import, and a vault export containing albums plus price history, smart collections, and purchases.
 2. Personal runtime files are ignored by Git and never belong in a repository.
 3. Clearing the hidden legacy browser cache does not clear server data.
 

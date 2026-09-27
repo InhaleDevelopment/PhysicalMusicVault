@@ -92,3 +92,27 @@ test("dashboard exposes market and delivered-cost controls", () => {
   for (const id of ["marketScope", "marketCountry", "marketRegion"]) assert.match(html, new RegExp(`id="${id}"`));
   for (const text of ["Worldwide", "Country", "Region", "Delivery", "Total"]) assert.match(html, new RegExp(text));
 });
+
+test("intelligence workspace connects price history, smart collections and purchases", () => {
+  for (const id of [
+    "intelligenceViewButton",
+    "intelligencePanel",
+    "priceHistoryAlbum",
+    "smartCollectionCards",
+    "purchaseLedger",
+    "smartCollectionDialog",
+    "purchaseDialog"
+  ]) assert.match(html, new RegExp(`id="${id}"`));
+  for (const fn of [
+    "renderPriceHistory",
+    "smartCollectionMatches",
+    "renderSmartCollections",
+    "renderPurchaseLedger",
+    "savePurchaseFromDialog"
+  ]) assert.match(html, new RegExp(`function ${fn}\\(`));
+  assert.match(css, /\.price-chart/);
+  assert.match(css, /\.smart-collection-card/);
+  assert.match(css, /\.ledger-status/);
+  assert.match(css, /grid-template-columns:\s*repeat\(5, 1fr\)/);
+  assert.match(html, /priceHistory:\s*priceHistoryRows\(\)[\s\S]*smartCollections:\s*smartCollections\(\)[\s\S]*purchases:\s*purchases\(\)/);
+});

@@ -15,6 +15,7 @@ Version 3 is a dependency-light Node.js application with no account, cloud datab
 7. Accept a result only when the direct seller page proves the artist, album, selected format, numeric price, active purchase control, and any requested market restriction.
 8. Extract a seller shipping rate where published; otherwise show a format- and distance-based estimate and keep it visibly labelled.
 9. Show new finds, the Top 100 priority-ranked available albums, and all current priority 5 matches with item, delivery, and total prices.
+10. Use Intelligence to follow lowest delivered prices over time, save live rule-based collection views, and compare purchase cost with current verified market value.
 
 Local album artwork is served through album IDs and never exposes its filesystem path to the browser.
 
@@ -58,7 +59,7 @@ Turn on **iPhone and iPad access** in Settings, turn the vault off and on once, 
 
 ## Privacy
 
-- Library data, preferences, scan history, and trusted vendors stay in ignored files under `outputs/`.
+- Library data, preferences, price observations, smart collections, purchases, scan history, and trusted vendors stay in ignored files under `outputs/`.
 - Search requests contain artist, album, public market terms, and release-search terms only. Local paths and music-service account details are never sent.
 - The browser reports its IANA timezone to the local server so daily queues and timestamps match the user's device.
 - The app does not change Windows proxy, DNS, hosts, or firewall settings. It makes ordinary outbound HTTPS requests from Node.js.

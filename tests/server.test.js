@@ -69,6 +69,9 @@ test("local server protects private data and supports the core album journey", a
   assert.equal(JSON.stringify(vault).includes(dataRoot), false);
   assert.equal(vault.settings.automationEnabled, false);
   assert.equal(vault.settings.searchFormat, "cd");
+  assert.equal(vault.smartCollections.length, 3);
+  assert.deepEqual(vault.purchases, []);
+  assert.deepEqual(vault.priceHistory, []);
   assert.equal(vault.albums[0].artworkUrl, "/api/artwork/artist-album");
   assert.equal((await fetch(`${base}${vault.albums[0].artworkUrl}`)).status, 200);
 
@@ -91,6 +94,45 @@ test("local server protects private data and supports the core album journey", a
   assert.equal(response.status, 200);
   assert.equal((await fetch(`${base}/api/albums/manual-release`, { method: "DELETE" })).status, 200);
   assert.equal((await fetch(`${base}/api/albums/artist-album`, { method: "DELETE" })).status, 409);
+
+  response = await fetch(`${base}/api/smart-collections`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: "Vinyl under 50",
+      rules: { status: "wanted", availability: "available", minPriority: 4, format: "vinyl", priceMode: "under", maxPrice: 50, currency: "AUD" }
+    })
+  });
+  const smartResult = await response.json();
+  assert.equal(response.status, 201);
+  assert.equal(smartResult.collection.rules.maxPrice, 50);
+
+  response = await fetch(`${base}/api/purchases`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      albumId: "artist-album",
+      itemCost: 20,
+      deliveryCost: 5,
+      currency: "AUD",
+      purchaseDate: "2026-09-27",
+      seller: "Local shop",
+      orderStatus: "received",
+      sourcePath: "C:\\private",
+      markOwned: true
+    })
+  });
+  const purchaseResult = await response.json();
+  assert.equal(response.status, 201);
+  assert.equal(purchaseResult.purchase.totalCost, 25);
+  assert.equal(JSON.stringify(purchaseResult).includes("C:\\private"), false);
+
+  vault = await (await fetch(`${base}/api/vault`)).json();
+  assert.equal(vault.purchases.length, 1);
+  assert.equal(vault.albums[0].status, "owned");
+
+  assert.equal((await fetch(`${base}/api/purchases/${purchaseResult.purchase.id}`, { method: "DELETE" })).status, 200);
+  assert.equal((await fetch(`${base}/api/smart-collections/${smartResult.collection.id}`, { method: "DELETE" })).status, 200);
 
   response = await fetch(`${base}/api/library-source`, {
     method: "POST",

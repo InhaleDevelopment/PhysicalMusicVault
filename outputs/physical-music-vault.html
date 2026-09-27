@@ -646,6 +646,7 @@
       <nav class="side-nav" aria-label="Primary navigation">
         <button id="homeViewButton" class="active" type="button">Available</button>
         <button id="searchViewButton" type="button">Collection</button>
+        <button id="intelligenceViewButton" type="button">Intelligence</button>
         <button id="healthViewButton" type="button">System</button>
         <button id="settingsViewButton" type="button">Settings</button>
       </nav>
@@ -738,6 +739,60 @@
         <nav id="artistIndex" class="artist-index" aria-label="Browse artists by initial"></nav>
         <div class="collection-meta"><p id="collectionResultCount">0 artists</p><p class="subtle">Wanted enters search. Owned and Not Interested stay out.</p></div>
         <section id="albumGrid" class="album-grid" aria-live="polite"></section>
+      </section>
+
+      <section id="intelligencePanel" class="view-panel" hidden>
+        <div class="intelligence-lead">
+          <div>
+            <span class="section-kicker">Collection intelligence</span>
+            <h2>Know when to buy. Know what you own.</h2>
+            <p class="subtle">Price movement, saved collection rules, and purchase value stay private on this device.</p>
+          </div>
+          <div class="row">
+            <button id="newSmartCollectionButton" type="button">New smart collection</button>
+            <button id="addPurchaseButton" class="primary" type="button">Record purchase</button>
+          </div>
+        </div>
+        <div id="intelligenceMetrics" class="intelligence-metrics" aria-label="Intelligence summary"></div>
+
+        <section class="intelligence-section price-history-section">
+          <div class="intelligence-section-head">
+            <div>
+              <span class="section-kicker">Price history</span>
+              <h2>Lowest delivered price</h2>
+              <p class="subtle">One observation per seller per day, with immediate capture when a price changes.</p>
+            </div>
+            <label class="compact-field">
+              <span class="label">Album</span>
+              <select id="priceHistoryAlbum" aria-label="Price history album"></select>
+            </label>
+          </div>
+          <div id="priceHistoryView" aria-live="polite"></div>
+        </section>
+
+        <section class="intelligence-section smart-collections-section">
+          <div class="intelligence-section-head">
+            <div>
+              <span class="section-kicker">Smart collections</span>
+              <h2>Saved buying views</h2>
+              <p class="subtle">Rules update automatically as your library, priorities, prices, and listings change.</p>
+            </div>
+          </div>
+          <div id="smartCollectionCards" class="smart-collection-cards" aria-label="Saved smart collections"></div>
+          <div id="smartCollectionResults" class="smart-collection-results" aria-live="polite"></div>
+        </section>
+
+        <section class="intelligence-section purchase-ledger-section">
+          <div class="intelligence-section-head">
+            <div>
+              <span class="section-kicker">Purchase ledger</span>
+              <h2>Acquisition record</h2>
+              <p class="subtle">Track paid and delivered cost, order progress, condition, and current verified market comparison.</p>
+            </div>
+            <button id="ledgerAddPurchaseButton" class="primary" type="button">Add purchase</button>
+          </div>
+          <div id="purchaseLedger" class="table-wrap" aria-live="polite"></div>
+        </section>
       </section>
 
       <section id="healthPanel" class="view-panel" hidden>
@@ -994,6 +1049,154 @@
     </form>
   </dialog>
 
+  <dialog id="smartCollectionDialog" class="intelligence-dialog">
+    <form method="dialog" class="dialog-inner" id="smartCollectionForm">
+      <div class="dialog-head">
+        <div>
+          <span class="eyebrow">Saved buying view</span>
+          <h2 id="smartCollectionDialogTitle">New smart collection</h2>
+        </div>
+        <button class="icon" value="cancel" type="submit" formnovalidate aria-label="Close smart collection" title="Close">&times;</button>
+      </div>
+      <input id="smartCollectionId" type="hidden">
+      <label>Name<input id="smartCollectionName" type="text" maxlength="80" required placeholder="Priority vinyl under AUD 50"></label>
+      <label>Description<input id="smartCollectionDescription" type="text" maxlength="240" placeholder="A short reminder of what this view finds"></label>
+      <div class="form-grid intelligence-rule-grid">
+        <label>Status
+          <select id="smartStatus">
+            <option value="all">Any status</option>
+            <option value="wanted">Wanted</option>
+            <option value="owned">Owned</option>
+            <option value="excluded">Not Interested</option>
+          </select>
+        </label>
+        <label>Availability
+          <select id="smartAvailability">
+            <option value="any">Available or unavailable</option>
+            <option value="available">Verified available</option>
+            <option value="unavailable">No verified listing</option>
+          </select>
+        </label>
+        <label>Minimum priority
+          <select id="smartPriority">
+            <option value="1">1 - Any priority</option>
+            <option value="2">2 or higher</option>
+            <option value="3">3 or higher</option>
+            <option value="4">4 or higher</option>
+            <option value="5">5 - Essential only</option>
+          </select>
+        </label>
+        <label>Physical format
+          <select id="smartFormat">
+            <option value="any">Any format</option>
+            <option value="cd">CD</option>
+            <option value="vinyl">Vinyl</option>
+            <option value="cassette">Cassette</option>
+          </select>
+        </label>
+        <label>Price rule
+          <select id="smartPriceMode">
+            <option value="any">Any price</option>
+            <option value="within-budget">Inside album price range</option>
+            <option value="under">Delivered price under</option>
+          </select>
+        </label>
+        <label>Maximum delivered price<input id="smartMaxPrice" type="number" min="0" step="0.01" inputmode="decimal" placeholder="50.00"></label>
+        <label>Currency
+          <select id="smartCurrency">
+            <option value="AUD">AUD</option>
+            <option value="USD">USD</option>
+            <option value="GBP">GBP</option>
+            <option value="EUR">EUR</option>
+          </select>
+        </label>
+        <label>Found within
+          <select id="smartFoundDays">
+            <option value="0">Any time</option>
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+            <option value="90">Last 90 days</option>
+            <option value="365">Last year</option>
+          </select>
+        </label>
+      </div>
+      <div class="row dialog-actions">
+        <button id="deleteSmartCollectionButton" class="danger" value="delete" type="submit">Delete</button>
+        <span class="grow"></span>
+        <button value="cancel" type="submit" formnovalidate>Cancel</button>
+        <button class="primary" value="save" type="submit">Save collection</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="purchaseDialog" class="intelligence-dialog">
+    <form method="dialog" class="dialog-inner" id="purchaseForm">
+      <div class="dialog-head">
+        <div>
+          <span class="eyebrow">Purchase ledger</span>
+          <h2 id="purchaseDialogTitle">Record purchase</h2>
+        </div>
+        <button class="icon" value="cancel" type="submit" formnovalidate aria-label="Close purchase" title="Close">&times;</button>
+      </div>
+      <input id="purchaseId" type="hidden">
+      <label>Album
+        <select id="purchaseAlbumId" required></select>
+      </label>
+      <div class="form-grid purchase-grid">
+        <label>Format
+          <select id="purchaseFormat">
+            <option value="cd">CD</option>
+            <option value="vinyl">Vinyl</option>
+            <option value="cassette">Cassette</option>
+          </select>
+        </label>
+        <label>Seller<input id="purchaseSeller" type="text" maxlength="200" placeholder="Record shop or marketplace"></label>
+        <label>Item price<input id="purchaseItemCost" type="number" min="0" step="0.01" inputmode="decimal" required placeholder="24.99"></label>
+        <label>Delivery<input id="purchaseDeliveryCost" type="number" min="0" step="0.01" inputmode="decimal" value="0"></label>
+        <label>Currency
+          <select id="purchaseCurrency">
+            <option value="AUD">AUD</option>
+            <option value="USD">USD</option>
+            <option value="GBP">GBP</option>
+            <option value="EUR">EUR</option>
+          </select>
+        </label>
+        <label>Purchase date<input id="purchaseDate" type="date" required></label>
+        <label>Condition
+          <select id="purchaseCondition">
+            <option value="new">New</option>
+            <option value="sealed">Sealed</option>
+            <option value="mint">Mint</option>
+            <option value="near-mint">Near mint</option>
+            <option value="very-good">Very good</option>
+            <option value="good">Good</option>
+            <option value="unknown">Not recorded</option>
+          </select>
+        </label>
+        <label>Order status
+          <select id="purchaseOrderStatus">
+            <option value="ordered">Ordered</option>
+            <option value="shipped">Shipped</option>
+            <option value="received">Received</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </label>
+      </div>
+      <label>Seller link<input id="purchaseUrl" type="url" placeholder="https://"></label>
+      <label>Notes<textarea id="purchaseNotes" maxlength="2000" placeholder="Edition, catalogue number, grading notes, or order reference"></textarea></label>
+      <label class="settings-toggle purchase-owned-toggle">
+        <span><strong>Mark album Owned</strong><span class="subtle">Update the Collection record when this purchase is saved.</span></span>
+        <input id="purchaseMarkOwned" type="checkbox" checked>
+      </label>
+      <div class="row dialog-actions">
+        <button id="deletePurchaseButton" class="danger" value="delete" type="submit">Delete</button>
+        <span class="grow"></span>
+        <button value="cancel" type="submit" formnovalidate>Cancel</button>
+        <button class="primary" value="save" type="submit">Save purchase</button>
+      </div>
+    </form>
+  </dialog>
+
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script>
@@ -1017,6 +1220,8 @@
       status: "all",
       scanFormat: "cd",
       artistCategory: "A",
+      activeSmartCollectionId: "",
+      priceHistoryAlbumId: "",
       view: "home",
       dailyPlanVisibleCount: 25,
       serverMode: false,
@@ -1034,10 +1239,12 @@
       importStatusButton: document.getElementById("importStatusButton"),
       homeViewButton: document.getElementById("homeViewButton"),
       searchViewButton: document.getElementById("searchViewButton"),
+      intelligenceViewButton: document.getElementById("intelligenceViewButton"),
       healthViewButton: document.getElementById("healthViewButton"),
       settingsViewButton: document.getElementById("settingsViewButton"),
       homePanel: document.getElementById("homePanel"),
       searchPanel: document.getElementById("searchPanel"),
+      intelligencePanel: document.getElementById("intelligencePanel"),
       healthPanel: document.getElementById("healthPanel"),
       settingsPanel: document.getElementById("settingsPanel"),
       scanPulse: document.getElementById("scanPulse"),
@@ -1074,6 +1281,15 @@
       searchBox: document.getElementById("searchBox"),
       statusFilter: document.getElementById("statusFilter"),
       albumGrid: document.getElementById("albumGrid"),
+      intelligenceMetrics: document.getElementById("intelligenceMetrics"),
+      priceHistoryAlbum: document.getElementById("priceHistoryAlbum"),
+      priceHistoryView: document.getElementById("priceHistoryView"),
+      smartCollectionCards: document.getElementById("smartCollectionCards"),
+      smartCollectionResults: document.getElementById("smartCollectionResults"),
+      newSmartCollectionButton: document.getElementById("newSmartCollectionButton"),
+      purchaseLedger: document.getElementById("purchaseLedger"),
+      addPurchaseButton: document.getElementById("addPurchaseButton"),
+      ledgerAddPurchaseButton: document.getElementById("ledgerAddPurchaseButton"),
       syncStatus: document.getElementById("syncStatus"),
       noticeBoard: document.getElementById("noticeBoard"),
       totalAlbums: document.getElementById("totalAlbums"),
@@ -1106,7 +1322,39 @@
       scanFormat: document.getElementById("scanFormat"),
       scanQueryLabel: document.getElementById("scanQueryLabel"),
       scanQueryPreview: document.getElementById("scanQueryPreview"),
-      startScanButton: document.getElementById("startScanButton")
+      startScanButton: document.getElementById("startScanButton"),
+      smartCollectionDialog: document.getElementById("smartCollectionDialog"),
+      smartCollectionForm: document.getElementById("smartCollectionForm"),
+      smartCollectionDialogTitle: document.getElementById("smartCollectionDialogTitle"),
+      smartCollectionId: document.getElementById("smartCollectionId"),
+      smartCollectionName: document.getElementById("smartCollectionName"),
+      smartCollectionDescription: document.getElementById("smartCollectionDescription"),
+      smartStatus: document.getElementById("smartStatus"),
+      smartAvailability: document.getElementById("smartAvailability"),
+      smartPriority: document.getElementById("smartPriority"),
+      smartFormat: document.getElementById("smartFormat"),
+      smartPriceMode: document.getElementById("smartPriceMode"),
+      smartMaxPrice: document.getElementById("smartMaxPrice"),
+      smartCurrency: document.getElementById("smartCurrency"),
+      smartFoundDays: document.getElementById("smartFoundDays"),
+      deleteSmartCollectionButton: document.getElementById("deleteSmartCollectionButton"),
+      purchaseDialog: document.getElementById("purchaseDialog"),
+      purchaseForm: document.getElementById("purchaseForm"),
+      purchaseDialogTitle: document.getElementById("purchaseDialogTitle"),
+      purchaseId: document.getElementById("purchaseId"),
+      purchaseAlbumId: document.getElementById("purchaseAlbumId"),
+      purchaseFormat: document.getElementById("purchaseFormat"),
+      purchaseSeller: document.getElementById("purchaseSeller"),
+      purchaseItemCost: document.getElementById("purchaseItemCost"),
+      purchaseDeliveryCost: document.getElementById("purchaseDeliveryCost"),
+      purchaseCurrency: document.getElementById("purchaseCurrency"),
+      purchaseDate: document.getElementById("purchaseDate"),
+      purchaseCondition: document.getElementById("purchaseCondition"),
+      purchaseOrderStatus: document.getElementById("purchaseOrderStatus"),
+      purchaseUrl: document.getElementById("purchaseUrl"),
+      purchaseNotes: document.getElementById("purchaseNotes"),
+      purchaseMarkOwned: document.getElementById("purchaseMarkOwned"),
+      deletePurchaseButton: document.getElementById("deletePurchaseButton")
     };
 
     function loadVault() {
@@ -1709,14 +1957,264 @@
         .slice(0, 5);
     }
 
+    function intelligenceCurrency() {
+      return String(state.vaultMeta?.settings?.currency || deviceCurrency()).toUpperCase();
+    }
+
+    function convertAmount(amount, fromCurrency, toCurrency) {
+      const numeric = Number(amount);
+      const rates = state.vaultMeta?.settings?.exchangeRatesToAud || { AUD: 1, USD: 1.52, EUR: 1.65, GBP: 1.95 };
+      const fromRate = Number(rates[String(fromCurrency || "AUD").toUpperCase()]);
+      const toRate = Number(rates[String(toCurrency || "AUD").toUpperCase()]);
+      if (!Number.isFinite(numeric) || !Number.isFinite(fromRate) || !Number.isFinite(toRate) || fromRate <= 0 || toRate <= 0) return null;
+      return Number(((numeric * fromRate) / toRate).toFixed(2));
+    }
+
+    function money(amount, currency = intelligenceCurrency()) {
+      return Number.isFinite(Number(amount)) ? `${currency} ${Number(amount).toFixed(2)}` : "—";
+    }
+
+    function deliveredAmount(listing, currency = intelligenceCurrency()) {
+      if (!listing) return null;
+      const direct = listing.deliveredConvertedPrices?.[currency] ?? listing.deliveredBudgetAmount;
+      if (isMoneyValue(direct)) return Number(direct);
+      if (isMoneyValue(listing.audPrice)) {
+        const deliveryAud = Number(listing.deliveryConvertedPrices?.AUD || 0);
+        return convertAmount(Number(listing.audPrice) + deliveryAud, "AUD", currency);
+      }
+      const item = parsePrice(listing.originalAmount ?? listing.currentCost ?? listing.price);
+      if (item === null) return null;
+      const itemCurrency = listing.originalCurrency || listing.currency || currency;
+      const delivery = parsePrice(listing.deliveryCost) || 0;
+      const deliveryCurrency = listing.deliveryCurrency || itemCurrency;
+      const convertedItem = convertAmount(item, itemCurrency, currency);
+      const convertedDelivery = convertAmount(delivery, deliveryCurrency, currency) || 0;
+      return convertedItem === null ? null : Number((convertedItem + convertedDelivery).toFixed(2));
+    }
+
+    function priceHistoryRows() {
+      return Array.isArray(state.vaultMeta?.priceHistory) ? state.vaultMeta.priceHistory : [];
+    }
+
+    function renderPriceHistory() {
+      const rows = priceHistoryRows().filter(row => state.albums.some(album => album.id === row.albumId));
+      const albumIds = [...new Set(rows.map(row => row.albumId))];
+      const albums = albumIds
+        .map(id => state.albums.find(album => album.id === id))
+        .filter(Boolean)
+        .sort((a, b) => catalogueCollator.compare(a.artist, b.artist) || catalogueCollator.compare(a.album, b.album));
+      if (!albums.length) {
+        state.priceHistoryAlbumId = "";
+        els.priceHistoryAlbum.innerHTML = `<option>No observations yet</option>`;
+        els.priceHistoryAlbum.disabled = true;
+        els.priceHistoryView.innerHTML = `<div class="intelligence-empty"><strong>Price history starts with the next verified scan.</strong><span>Every accepted seller price is retained locally, with repeat observations compacted to one per day.</span></div>`;
+        return;
+      }
+      els.priceHistoryAlbum.disabled = false;
+      if (!albumIds.includes(state.priceHistoryAlbumId)) {
+        state.priceHistoryAlbumId = [...rows].sort((a, b) => String(b.observedAt).localeCompare(String(a.observedAt)))[0]?.albumId || albums[0].id;
+      }
+      els.priceHistoryAlbum.innerHTML = albums.map(album => `<option value="${escapeAttribute(album.id)}" ${album.id === state.priceHistoryAlbumId ? "selected" : ""}>${escapeHtml(`${album.artist} — ${album.album}`)}</option>`).join("");
+      const currency = intelligenceCurrency();
+      const observations = rows
+        .filter(row => row.albumId === state.priceHistoryAlbumId)
+        .map(row => ({ ...row, displayTotal: convertAmount(row.audTotal, "AUD", currency) }))
+        .filter(row => Number.isFinite(row.displayTotal))
+        .sort((a, b) => String(a.observedAt).localeCompare(String(b.observedAt)));
+      const byDay = new Map();
+      observations.forEach(row => {
+        const day = localDateKey(row.observedAt);
+        const previous = byDay.get(day);
+        if (!previous || row.displayTotal < previous.displayTotal) byDay.set(day, row);
+      });
+      const daily = [...byDay.entries()].map(([day, row]) => ({ day, ...row }));
+      const values = daily.map(row => row.displayTotal);
+      const latest = values.at(-1);
+      const lowest = Math.min(...values);
+      const highest = Math.max(...values);
+      const first = values[0];
+      const change = first ? ((latest - first) / first) * 100 : 0;
+      const width = 760;
+      const height = 220;
+      const padX = 18;
+      const padY = 24;
+      const span = Math.max(1, highest - lowest);
+      const points = daily.map((row, index) => {
+        const x = daily.length === 1 ? width / 2 : padX + (index / (daily.length - 1)) * (width - padX * 2);
+        const y = padY + ((highest - row.displayTotal) / span) * (height - padY * 2);
+        return { ...row, x, y };
+      });
+      const line = points.map(point => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
+      const album = state.albums.find(item => item.id === state.priceHistoryAlbumId);
+      els.priceHistoryView.innerHTML = `
+        <div class="price-summary-grid">
+          <div><span>Latest low</span><strong>${escapeHtml(money(latest, currency))}</strong></div>
+          <div><span>All-time low</span><strong>${escapeHtml(money(lowest, currency))}</strong></div>
+          <div><span>Observed high</span><strong>${escapeHtml(money(highest, currency))}</strong></div>
+          <div><span>Movement</span><strong class="${change < 0 ? "trend-down" : change > 0 ? "trend-up" : ""}">${change > 0 ? "+" : ""}${change.toFixed(1)}%</strong></div>
+        </div>
+        <div class="price-chart-wrap">
+          <div class="price-chart-title"><strong>${escapeHtml(album?.album || "Album")}</strong><span>${escapeHtml(album?.artist || "")} · ${daily.length} observed day${daily.length === 1 ? "" : "s"}</span></div>
+          <svg class="price-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Lowest delivered price history for ${escapeAttribute(album?.artist || "")} ${escapeAttribute(album?.album || "")}">
+            <line x1="${padX}" y1="${padY}" x2="${width - padX}" y2="${padY}" class="chart-grid-line"></line>
+            <line x1="${padX}" y1="${height / 2}" x2="${width - padX}" y2="${height / 2}" class="chart-grid-line"></line>
+            <line x1="${padX}" y1="${height - padY}" x2="${width - padX}" y2="${height - padY}" class="chart-grid-line"></line>
+            ${points.length > 1 ? `<polyline points="${line}" class="chart-price-line"></polyline>` : ""}
+            ${points.map(point => `<circle cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="5" class="chart-price-point"><title>${escapeHtml(`${new Date(point.observedAt).toLocaleDateString()} · ${money(point.displayTotal, currency)} · ${point.seller}`)}</title></circle>`).join("")}
+          </svg>
+          <div class="price-chart-axis"><span>${escapeHtml(daily[0]?.day || "")}</span><span>${escapeHtml(daily.at(-1)?.day || "")}</span></div>
+        </div>
+        <div class="price-observation-list">
+          ${[...observations].reverse().slice(0, 6).map(row => `<a href="${escapeAttribute(row.listingUrl)}" target="_blank" rel="noopener"><span><strong>${escapeHtml(row.seller)}</strong><small>${escapeHtml(new Date(row.observedAt).toLocaleString())} · ${escapeHtml(String(row.format || "cd").toUpperCase())}</small></span><b>${escapeHtml(money(row.displayTotal, currency))}</b></a>`).join("")}
+        </div>`;
+    }
+
+    function smartCollections() {
+      return Array.isArray(state.vaultMeta?.smartCollections) ? state.vaultMeta.smartCollections : [];
+    }
+
+    function smartCollectionMatches(collection) {
+      const rules = collection.rules || {};
+      const now = Date.now();
+      return state.albums.flatMap(album => {
+        const listing = latestVerifiedListing(album);
+        if (rules.status && rules.status !== "all" && albumStatus(album) !== rules.status) return [];
+        if (albumPriority(album) < Number(rules.minPriority || 1)) return [];
+        if (rules.availability === "available" && !listing) return [];
+        if (rules.availability === "unavailable" && listing) return [];
+        const format = String(listing?.format || album.format || "cd").toLowerCase();
+        if (rules.format && rules.format !== "any" && format !== rules.format) return [];
+        if (rules.priceMode === "within-budget" && (!listing || rangeStatus(listing) !== "inside")) return [];
+        if (rules.priceMode === "under") {
+          const amount = deliveredAmount(listing, rules.currency || intelligenceCurrency());
+          if (amount === null || !Number.isFinite(Number(rules.maxPrice)) || amount > Number(rules.maxPrice)) return [];
+        }
+        if (Number(rules.foundWithinDays) > 0) {
+          const verified = Date.parse(listingVerifiedAt(listing));
+          if (!Number.isFinite(verified) || now - verified > Number(rules.foundWithinDays) * 86400000) return [];
+        }
+        return [{ album, listing }];
+      }).sort((a, b) => albumPriority(b.album) - albumPriority(a.album) || catalogueCollator.compare(a.album.artist, b.album.artist) || catalogueCollator.compare(a.album.album, b.album.album));
+    }
+
+    function smartRuleSummary(collection) {
+      const rules = collection.rules || {};
+      const parts = [];
+      if (rules.status && rules.status !== "all") parts.push(statusLabel(rules.status));
+      if (Number(rules.minPriority) > 1) parts.push(`Priority ${rules.minPriority}+`);
+      if (rules.availability === "available") parts.push("Available");
+      if (rules.availability === "unavailable") parts.push("No listing");
+      if (rules.format && rules.format !== "any") parts.push(String(rules.format).toUpperCase());
+      if (rules.priceMode === "within-budget") parts.push("Inside price range");
+      if (rules.priceMode === "under") parts.push(`Under ${money(rules.maxPrice, rules.currency)}`);
+      if (Number(rules.foundWithinDays) > 0) parts.push(`Last ${rules.foundWithinDays} days`);
+      return parts.join(" · ") || "All albums";
+    }
+
+    function renderSmartCollections() {
+      const collections = smartCollections();
+      if (!collections.length) {
+        state.activeSmartCollectionId = "";
+        els.smartCollectionCards.innerHTML = "";
+        els.smartCollectionResults.innerHTML = `<div class="intelligence-empty"><strong>No smart collections saved.</strong><span>Create a reusable view from status, priority, availability, format, price, and recency rules.</span><button class="primary" type="button" data-smart-action="new">Create smart collection</button></div>`;
+        return;
+      }
+      if (!collections.some(collection => collection.id === state.activeSmartCollectionId)) state.activeSmartCollectionId = collections[0].id;
+      els.smartCollectionCards.innerHTML = collections.map(collection => {
+        const matches = smartCollectionMatches(collection);
+        const selected = collection.id === state.activeSmartCollectionId;
+        return `<button type="button" class="smart-collection-card" data-smart-id="${escapeAttribute(collection.id)}" aria-pressed="${selected}"><span>${escapeHtml(collection.name)}</span><strong>${matches.length}</strong><small>${escapeHtml(smartRuleSummary(collection))}</small></button>`;
+      }).join("");
+      const active = collections.find(collection => collection.id === state.activeSmartCollectionId);
+      const matches = smartCollectionMatches(active);
+      els.smartCollectionResults.innerHTML = `
+        <div class="smart-result-head">
+          <div><h3>${escapeHtml(active.name)}</h3><p>${escapeHtml(active.description || smartRuleSummary(active))}</p></div>
+          <button type="button" data-smart-action="edit" data-smart-id="${escapeAttribute(active.id)}">Edit rules</button>
+        </div>
+        ${matches.length ? `<div class="table-wrap"><table class="available-table intelligence-table">
+          <thead><tr><th>Album</th><th>Artist</th><th>Priority</th><th>Format</th><th>Delivered</th><th>Seller</th><th>Action</th></tr></thead>
+          <tbody>${matches.slice(0, 100).map(({ album, listing }) => `<tr>
+            <td class="table-title" data-label="Album">${escapeHtml(album.album)}</td>
+            <td data-label="Artist">${escapeHtml(album.artist)}</td>
+            <td data-label="Priority">${albumPriority(album)}</td>
+            <td data-label="Format">${escapeHtml(String(listing?.format || album.format || "cd").toUpperCase())}</td>
+            <td class="price" data-label="Delivered">${escapeHtml(listing ? formatDeliveredPrice(listing) : "—")}</td>
+            <td data-label="Seller">${listing ? `<a href="${escapeAttribute(listingUrl(listing))}" target="_blank" rel="noopener">${escapeHtml(listing.marketplace || listing.host || "Open")}</a>` : "—"}</td>
+            <td data-label="Action"><button class="table-action" type="button" data-purchase-album-id="${escapeAttribute(album.id)}">Record purchase</button></td>
+          </tr>`).join("")}</tbody>
+        </table></div>${matches.length > 100 ? `<p class="subtle intelligence-limit-note">Showing the first 100 of ${matches.length} matches.</p>` : ""}` : `<div class="intelligence-empty compact"><strong>No albums match these rules today.</strong><span>The view will update automatically when library or listing data changes.</span></div>`}`;
+    }
+
+    function purchases() {
+      return Array.isArray(state.vaultMeta?.purchases) ? state.vaultMeta.purchases : [];
+    }
+
+    function purchaseSpend(purchase, currency = intelligenceCurrency()) {
+      return convertAmount(purchase.totalCost, purchase.currency, currency);
+    }
+
+    function renderPurchaseLedger() {
+      const currency = intelligenceCurrency();
+      const rows = [...purchases()].sort((a, b) => String(b.purchaseDate).localeCompare(String(a.purchaseDate)) || String(b.createdAt).localeCompare(String(a.createdAt)));
+      if (!rows.length) {
+        els.purchaseLedger.innerHTML = `<div class="intelligence-empty"><strong>No purchases recorded yet.</strong><span>Record an acquisition to track spend, delivery, condition, and current market comparison.</span><button class="primary" type="button" data-ledger-action="new">Record first purchase</button></div>`;
+        return;
+      }
+      els.purchaseLedger.innerHTML = `<table class="available-table intelligence-table purchase-table">
+        <thead><tr><th>Date</th><th>Album</th><th>Format</th><th>Seller</th><th>Status</th><th>Paid</th><th>Market now</th><th>Difference</th><th></th></tr></thead>
+        <tbody>${rows.map(purchase => {
+          const album = state.albums.find(item => item.id === purchase.albumId);
+          const listing = album ? latestVerifiedListing(album) : null;
+          const paid = purchaseSpend(purchase, currency);
+          const market = deliveredAmount(listing, currency);
+          const difference = market === null || paid === null ? null : Number((market - paid).toFixed(2));
+          return `<tr>
+            <td data-label="Date">${escapeHtml(new Date(`${purchase.purchaseDate}T00:00:00`).toLocaleDateString())}</td>
+            <td class="table-title" data-label="Album"><span>${escapeHtml(purchase.album)}</span><small>${escapeHtml(purchase.artist)}</small></td>
+            <td data-label="Format">${escapeHtml(String(purchase.format || "cd").toUpperCase())}</td>
+            <td data-label="Seller">${purchase.purchaseUrl ? `<a href="${escapeAttribute(purchase.purchaseUrl)}" target="_blank" rel="noopener">${escapeHtml(purchase.seller || "Seller")}</a>` : escapeHtml(purchase.seller || "—")}</td>
+            <td data-label="Status"><span class="ledger-status ${escapeAttribute(purchase.orderStatus)}">${escapeHtml(String(purchase.orderStatus || "ordered").replace("-", " "))}</span></td>
+            <td class="price" data-label="Paid">${escapeHtml(money(paid, currency))}</td>
+            <td data-label="Market now">${escapeHtml(money(market, currency))}</td>
+            <td class="${difference > 0 ? "value-positive" : difference < 0 ? "value-negative" : ""}" data-label="Difference">${difference === null ? "—" : `${difference > 0 ? "+" : ""}${escapeHtml(money(difference, currency))}`}</td>
+            <td data-label=""><button class="table-action" type="button" data-purchase-edit="${escapeAttribute(purchase.id)}">Edit</button></td>
+          </tr>`;
+        }).join("")}</tbody>
+      </table>`;
+    }
+
+    function renderIntelligence() {
+      if (!els.intelligenceMetrics) return;
+      const currency = intelligenceCurrency();
+      const history = priceHistoryRows();
+      const purchaseRows = purchases().filter(purchase => purchase.orderStatus !== "cancelled");
+      const invested = purchaseRows.reduce((total, purchase) => total + (purchaseSpend(purchase, currency) || 0), 0);
+      const marketValues = purchaseRows.map(purchase => {
+        const album = state.albums.find(item => item.id === purchase.albumId);
+        return deliveredAmount(album ? latestVerifiedListing(album) : null, currency);
+      }).filter(value => value !== null);
+      const marketTotal = marketValues.reduce((total, value) => total + value, 0);
+      els.intelligenceMetrics.innerHTML = `
+        <div><span>Price observations</span><strong>${history.length.toLocaleString()}</strong><small>${new Set(history.map(row => row.albumId)).size.toLocaleString()} albums tracked</small></div>
+        <div><span>Smart collections</span><strong>${smartCollections().length.toLocaleString()}</strong><small>Live saved views</small></div>
+        <div><span>Acquisitions</span><strong>${purchaseRows.length.toLocaleString()}</strong><small>${money(invested, currency)} invested</small></div>
+        <div><span>Verified market value</span><strong>${money(marketTotal, currency)}</strong><small>${marketValues.length} purchase${marketValues.length === 1 ? "" : "s"} with live prices</small></div>`;
+      renderPriceHistory();
+      renderSmartCollections();
+      renderPurchaseLedger();
+    }
+
     function setView(view) {
       state.view = view;
       els.homePanel.hidden = view !== "home";
       els.searchPanel.hidden = view !== "search";
+      els.intelligencePanel.hidden = view !== "intelligence";
       els.healthPanel.hidden = view !== "health";
       els.settingsPanel.hidden = view !== "settings";
       els.homeViewButton.classList.toggle("active", view === "home");
       els.searchViewButton.classList.toggle("active", view === "search");
+      els.intelligenceViewButton.classList.toggle("active", view === "intelligence");
       els.healthViewButton.classList.toggle("active", view === "health");
       els.settingsViewButton.classList.toggle("active", view === "settings");
       renderPageHeader();
@@ -1727,6 +2225,7 @@
       const headings = {
         home: ["Local collection intelligence", "Available physical releases"],
         search: ["Your indexed collection", "Artist shelves"],
+        intelligence: ["Buying and ownership insight", "Intelligence"],
         health: ["Local service status", "System health"],
         settings: ["Private on this device", "Vault settings"]
       };
@@ -1735,6 +2234,10 @@
       els.pageHeading.textContent = heading;
       if (state.view === "search") {
         els.dashboardSubtitle.textContent = "A–Z, then 0–9 · every album one click away";
+        return;
+      }
+      if (state.view === "intelligence") {
+        els.dashboardSubtitle.textContent = "Price history · smart collections · purchase ledger";
         return;
       }
       if (state.view === "health") {
@@ -1872,6 +2375,7 @@
       renderAvailableTable();
       renderHealth();
       renderSettings();
+      renderIntelligence();
       renderArtistIndex();
       const scopeLabel = state.query.trim() ? `Search: “${state.query.trim()}”` : state.artistCategory === "#" ? "Other" : state.artistCategory;
       els.collectionResultCount.innerHTML = `<strong>${escapeHtml(scopeLabel)}</strong><span>${artistGroups.length.toLocaleString()} artist${artistGroups.length === 1 ? "" : "s"} · ${filteredAlbums.length.toLocaleString()} album${filteredAlbums.length === 1 ? "" : "s"}</span>`;
@@ -2602,6 +3106,184 @@
       }
     }
 
+    function openSmartCollectionEditor(collection = null) {
+      const rules = collection?.rules || {};
+      els.smartCollectionDialogTitle.textContent = collection ? "Edit smart collection" : "New smart collection";
+      els.smartCollectionId.value = collection?.id || "";
+      els.smartCollectionName.value = collection?.name || "";
+      els.smartCollectionDescription.value = collection?.description || "";
+      els.smartStatus.value = rules.status || "wanted";
+      els.smartAvailability.value = rules.availability || "available";
+      els.smartPriority.value = String(rules.minPriority || 3);
+      els.smartFormat.value = rules.format || "any";
+      els.smartPriceMode.value = rules.priceMode || "any";
+      els.smartMaxPrice.value = rules.maxPrice ?? "";
+      els.smartCurrency.value = rules.currency || intelligenceCurrency();
+      els.smartFoundDays.value = String(rules.foundWithinDays || 0);
+      els.smartMaxPrice.disabled = els.smartPriceMode.value !== "under";
+      els.deleteSmartCollectionButton.hidden = !collection;
+      els.smartCollectionDialog.showModal();
+      requestAnimationFrame(() => els.smartCollectionName.focus());
+    }
+
+    async function saveSmartCollectionFromDialog() {
+      if (!state.serverMode) {
+        showToast("Start the local dashboard before saving a smart collection.");
+        return false;
+      }
+      const id = els.smartCollectionId.value;
+      const payload = {
+        name: clean(els.smartCollectionName.value),
+        description: clean(els.smartCollectionDescription.value),
+        rules: {
+          status: els.smartStatus.value,
+          availability: els.smartAvailability.value,
+          minPriority: Number(els.smartPriority.value),
+          format: els.smartFormat.value,
+          priceMode: els.smartPriceMode.value,
+          maxPrice: els.smartMaxPrice.value,
+          currency: els.smartCurrency.value,
+          foundWithinDays: Number(els.smartFoundDays.value)
+        }
+      };
+      try {
+        const response = await fetch(id ? `/api/smart-collections/${encodeURIComponent(id)}` : "/api/smart-collections", {
+          method: id ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.message || "Smart collection could not be saved.");
+        const collections = smartCollections().filter(collection => collection.id !== result.collection.id);
+        collections.push(result.collection);
+        state.vaultMeta = { ...(state.vaultMeta || {}), smartCollections: collections };
+        state.activeSmartCollectionId = result.collection.id;
+        renderIntelligence();
+        showToast("Smart collection saved.");
+        return true;
+      } catch (error) {
+        showToast(error.message || "Smart collection could not be saved.");
+        return false;
+      }
+    }
+
+    async function deleteSmartCollectionFromDialog() {
+      const id = els.smartCollectionId.value;
+      if (!id || !state.serverMode) return false;
+      try {
+        const response = await fetch(`/api/smart-collections/${encodeURIComponent(id)}`, { method: "DELETE" });
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.message || "Smart collection could not be deleted.");
+        const collections = smartCollections().filter(collection => collection.id !== id);
+        state.vaultMeta = { ...(state.vaultMeta || {}), smartCollections: collections };
+        state.activeSmartCollectionId = collections[0]?.id || "";
+        renderIntelligence();
+        showToast("Smart collection deleted.");
+        return true;
+      } catch (error) {
+        showToast(error.message || "Smart collection could not be deleted.");
+        return false;
+      }
+    }
+
+    function purchaseAlbumOptions(selectedId = "") {
+      return [...state.albums]
+        .filter(album => !album.missing)
+        .sort((a, b) => catalogueCollator.compare(a.artist, b.artist) || catalogueCollator.compare(a.album, b.album))
+        .map(album => `<option value="${escapeAttribute(album.id)}" ${album.id === selectedId ? "selected" : ""}>${escapeHtml(`${album.artist} — ${album.album}`)}</option>`)
+        .join("");
+    }
+
+    function openPurchaseEditor(purchase = null, albumId = "") {
+      const selectedAlbumId = purchase?.albumId || albumId || state.albums.find(album => !album.missing)?.id || "";
+      const album = state.albums.find(item => item.id === selectedAlbumId);
+      const listing = album ? latestVerifiedListing(album) : null;
+      const currency = purchase?.currency || intelligenceCurrency();
+      const listingItem = listing?.convertedPrices?.[currency]
+        ?? (isMoneyValue(listing?.audPrice) ? convertAmount(listing.audPrice, "AUD", currency) : null);
+      const listingDelivery = listing?.deliveryConvertedPrices?.[currency]
+        ?? (isMoneyValue(listing?.deliveryConvertedPrices?.AUD) ? convertAmount(listing.deliveryConvertedPrices.AUD, "AUD", currency) : 0);
+      els.purchaseDialogTitle.textContent = purchase ? "Edit purchase" : "Record purchase";
+      els.purchaseId.value = purchase?.id || "";
+      els.purchaseAlbumId.innerHTML = purchaseAlbumOptions(selectedAlbumId);
+      els.purchaseAlbumId.disabled = Boolean(purchase);
+      els.purchaseFormat.value = purchase?.format || listing?.format || album?.format || "cd";
+      els.purchaseSeller.value = purchase?.seller || listing?.marketplace || listing?.host || "";
+      els.purchaseItemCost.value = purchase?.itemCost ?? listingItem ?? "";
+      els.purchaseDeliveryCost.value = purchase?.deliveryCost ?? listingDelivery ?? 0;
+      els.purchaseCurrency.value = currency;
+      els.purchaseDate.value = purchase?.purchaseDate || localDateKey();
+      els.purchaseCondition.value = purchase?.condition || "new";
+      els.purchaseOrderStatus.value = purchase?.orderStatus || "ordered";
+      els.purchaseUrl.value = purchase?.purchaseUrl || listingUrl(listing || {});
+      els.purchaseNotes.value = purchase?.notes || "";
+      els.purchaseMarkOwned.checked = !purchase;
+      els.deletePurchaseButton.hidden = !purchase;
+      els.purchaseDialog.showModal();
+      requestAnimationFrame(() => (purchase ? els.purchaseSeller : els.purchaseAlbumId).focus());
+    }
+
+    async function savePurchaseFromDialog() {
+      if (!state.serverMode) {
+        showToast("Start the local dashboard before saving a purchase.");
+        return false;
+      }
+      const id = els.purchaseId.value;
+      const payload = {
+        albumId: els.purchaseAlbumId.value,
+        format: els.purchaseFormat.value,
+        seller: clean(els.purchaseSeller.value),
+        itemCost: els.purchaseItemCost.value,
+        deliveryCost: els.purchaseDeliveryCost.value,
+        currency: els.purchaseCurrency.value,
+        purchaseDate: els.purchaseDate.value,
+        condition: els.purchaseCondition.value,
+        orderStatus: els.purchaseOrderStatus.value,
+        purchaseUrl: clean(els.purchaseUrl.value),
+        notes: clean(els.purchaseNotes.value),
+        markOwned: els.purchaseMarkOwned.checked
+      };
+      try {
+        const response = await fetch(id ? `/api/purchases/${encodeURIComponent(id)}` : "/api/purchases", {
+          method: id ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.message || "Purchase could not be saved.");
+        const rows = purchases().filter(purchase => purchase.id !== result.purchase.id);
+        rows.push(result.purchase);
+        state.vaultMeta = { ...(state.vaultMeta || {}), purchases: rows };
+        if (result.album) {
+          state.albums = state.albums.map(album => album.id === result.album.id ? { ...album, ...result.album } : album);
+          localStorage.setItem(storageKey, JSON.stringify(state.albums));
+        }
+        render();
+        showToast("Purchase saved to the ledger.");
+        return true;
+      } catch (error) {
+        showToast(error.message || "Purchase could not be saved.");
+        return false;
+      }
+    }
+
+    async function deletePurchaseFromDialog() {
+      const id = els.purchaseId.value;
+      if (!id || !state.serverMode) return false;
+      try {
+        const response = await fetch(`/api/purchases/${encodeURIComponent(id)}`, { method: "DELETE" });
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.message || "Purchase could not be deleted.");
+        state.vaultMeta = { ...(state.vaultMeta || {}), purchases: purchases().filter(purchase => purchase.id !== id) };
+        renderIntelligence();
+        showToast("Purchase deleted.");
+        return true;
+      } catch (error) {
+        showToast(error.message || "Purchase could not be deleted.");
+        return false;
+      }
+    }
+
     async function selectDailyScanPlan(quiet = false) {
       if (!state.serverMode) {
         showToast("Start the local dashboard before selecting today's albums.");
@@ -2653,10 +3335,18 @@
 
     els.sampleButton.addEventListener("click", () => mergeAlbums(sampleAlbums));
     els.addAlbumButton.addEventListener("click", () => openEditor());
-    els.exportButton.addEventListener("click", () => downloadJson("physical-music-vault.json", { exportedAt: new Date().toISOString(), albums: state.albums }));
+    els.exportButton.addEventListener("click", () => downloadJson("physical-music-vault.json", {
+      schemaVersion: 2,
+      exportedAt: new Date().toISOString(),
+      albums: state.albums,
+      priceHistory: priceHistoryRows(),
+      smartCollections: smartCollections(),
+      purchases: purchases()
+    }));
     els.importStatusButton.addEventListener("click", () => els.availabilityFile.click());
     els.homeViewButton.addEventListener("click", () => setView("home"));
     els.searchViewButton.addEventListener("click", () => setView("search"));
+    els.intelligenceViewButton.addEventListener("click", () => setView("intelligence"));
     els.healthViewButton.addEventListener("click", () => setView("health"));
     els.settingsViewButton.addEventListener("click", () => setView("settings"));
     els.automationToggle.addEventListener("change", event => updateAutomationSetting(event.target.checked));
@@ -2690,6 +3380,40 @@
       requestAnimationFrame(() => els.artistIndex.querySelector(`[data-artist-category="${CSS.escape(state.artistCategory)}"]`)?.focus({ preventScroll: true }));
     });
     els.collectionScanButton.addEventListener("click", openScanLauncher);
+    els.priceHistoryAlbum.addEventListener("change", event => {
+      state.priceHistoryAlbumId = event.target.value;
+      renderPriceHistory();
+    });
+    els.newSmartCollectionButton.addEventListener("click", () => openSmartCollectionEditor());
+    els.addPurchaseButton.addEventListener("click", () => openPurchaseEditor());
+    els.ledgerAddPurchaseButton.addEventListener("click", () => openPurchaseEditor());
+    els.smartCollectionCards.addEventListener("click", event => {
+      const card = event.target.closest("[data-smart-id]");
+      if (!card) return;
+      state.activeSmartCollectionId = card.dataset.smartId;
+      renderSmartCollections();
+    });
+    els.smartCollectionResults.addEventListener("click", event => {
+      const smartAction = event.target.closest("[data-smart-action]");
+      if (smartAction?.dataset.smartAction === "new") {
+        openSmartCollectionEditor();
+        return;
+      }
+      if (smartAction?.dataset.smartAction === "edit") {
+        openSmartCollectionEditor(smartCollections().find(collection => collection.id === smartAction.dataset.smartId));
+        return;
+      }
+      const purchaseButton = event.target.closest("[data-purchase-album-id]");
+      if (purchaseButton) openPurchaseEditor(null, purchaseButton.dataset.purchaseAlbumId);
+    });
+    els.purchaseLedger.addEventListener("click", event => {
+      if (event.target.closest('[data-ledger-action="new"]')) {
+        openPurchaseEditor();
+        return;
+      }
+      const editButton = event.target.closest("[data-purchase-edit]");
+      if (editButton) openPurchaseEditor(purchases().find(purchase => purchase.id === editButton.dataset.purchaseEdit));
+    });
     els.noticeBoard.addEventListener("click", event => {
       const target = event.target.closest("[data-view-target]");
       if (!target) return;
@@ -2806,6 +3530,47 @@
       const format = normaliseScanFormat(els.scanFormat.value);
       els.scanDialog.close();
       refreshAvailability(format);
+    });
+
+    els.smartPriceMode.addEventListener("change", () => {
+      els.smartMaxPrice.disabled = els.smartPriceMode.value !== "under";
+      if (els.smartMaxPrice.disabled) els.smartMaxPrice.value = "";
+    });
+    els.smartCollectionDialog.addEventListener("click", event => {
+      if (event.target === els.smartCollectionDialog) els.smartCollectionDialog.close();
+    });
+    els.smartCollectionForm.addEventListener("submit", async event => {
+      event.preventDefault();
+      if (event.submitter?.value === "cancel") {
+        els.smartCollectionDialog.close();
+        return;
+      }
+      if (event.submitter?.value === "delete") {
+        if (await deleteSmartCollectionFromDialog()) els.smartCollectionDialog.close();
+        return;
+      }
+      if (await saveSmartCollectionFromDialog()) els.smartCollectionDialog.close();
+    });
+
+    els.purchaseAlbumId.addEventListener("change", () => {
+      if (els.purchaseId.value) return;
+      const album = state.albums.find(item => item.id === els.purchaseAlbumId.value);
+      els.purchaseFormat.value = album?.format || "cd";
+    });
+    els.purchaseDialog.addEventListener("click", event => {
+      if (event.target === els.purchaseDialog) els.purchaseDialog.close();
+    });
+    els.purchaseForm.addEventListener("submit", async event => {
+      event.preventDefault();
+      if (event.submitter?.value === "cancel") {
+        els.purchaseDialog.close();
+        return;
+      }
+      if (event.submitter?.value === "delete") {
+        if (await deletePurchaseFromDialog()) els.purchaseDialog.close();
+        return;
+      }
+      if (await savePurchaseFromDialog()) els.purchaseDialog.close();
     });
 
     let lastShelfColumns = shelfColumnCount();

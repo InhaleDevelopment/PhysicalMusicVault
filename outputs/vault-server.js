@@ -1,4 +1,5 @@
 const http = require("http");
+const crypto = require("crypto");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -12,6 +13,15 @@ const {
   savePlan
 } = require("./scan-plan");
 const { albumPriority, isKnownDigitalOnlyUrl, normaliseAlbum, normaliseFormat, normaliseStatus } = require("./catalog-model");
+const {
+  MAX_PURCHASES,
+  MAX_SMART_COLLECTIONS,
+  appendPriceHistory,
+  normalisePurchase,
+  normalisePurchases,
+  normaliseSmartCollection,
+  normaliseSmartCollections
+} = require("./intelligence-model");
 const { searchWeb } = require("./web-search");
 const {
   atomicWriteJson,
@@ -499,6 +509,7 @@ function mergeAvailability(vault, updates) {
   }
   vault.schemaVersion = 2;
   vault.albums = [...byId.values()].map(normaliseAlbum);
+  vault.priceHistory = appendPriceHistory(vault.priceHistory, vault.albums, loadSettings());
   vault.matchEvents = [...matchEvents.values()]
     .sort((a, b) => String(b.discoveredAt || "").localeCompare(String(a.discoveredAt || "")))
     .slice(0, 5000);
@@ -588,6 +599,9 @@ function readVault() {
       });
     }) : [];
     vault.source = "Local music folder and imported catalogue files";
+    vault.priceHistory = appendPriceHistory(vault.priceHistory, vault.albums, loadSettings());
+    vault.smartCollections = normaliseSmartCollections(vault.smartCollections);
+    vault.purchases = normalisePurchases(vault.purchases, vault.albums);
     if (!Array.isArray(vault.matchEvents)) vault.matchEvents = [];
     const albumsById = new Map(vault.albums.map(album => [album.id, album]));
     vault.matchEvents = vault.matchEvents
@@ -694,6 +708,80 @@ function saveAlbum(albumId, payload, create = false) {
   writeVault(vault);
   getDailyScanPlan(vault, true);
   return album;
+}
+
+function recordId(prefix) {
+  return `${prefix}-${crypto.randomUUID()}`;
+}
+
+function saveSmartCollection(collectionId, payload, create = false) {
+  const vault = readVault();
+  const collections = normaliseSmartCollections(vault.smartCollections);
+  const index = collections.findIndex(collection => collection.id === collectionId);
+  if (index < 0 && !create) return null;
+  if (index < 0 && collections.length >= MAX_SMART_COLLECTIONS) {
+    throw new Error(`A maximum of ${MAX_SMART_COLLECTIONS} smart collections is supported.`);
+  }
+  const existing = index >= 0 ? collections[index] : {};
+  const collection = normaliseSmartCollection({
+    ...payload,
+    id: existing.id || collectionId || recordId("smart"),
+    updatedAt: new Date().toISOString()
+  }, existing);
+  if (!collection.name) throw new Error("Enter a name for the smart collection.");
+  if (index >= 0) collections[index] = collection;
+  else collections.push(collection);
+  vault.smartCollections = collections;
+  writeVault(vault);
+  return collection;
+}
+
+function deleteSmartCollection(collectionId) {
+  const vault = readVault();
+  const before = vault.smartCollections.length;
+  vault.smartCollections = vault.smartCollections.filter(collection => collection.id !== collectionId);
+  if (vault.smartCollections.length === before) return false;
+  writeVault(vault);
+  return true;
+}
+
+function savePurchase(purchaseId, payload, create = false) {
+  const vault = readVault();
+  const purchases = normalisePurchases(vault.purchases, vault.albums);
+  const index = purchases.findIndex(purchase => purchase.id === purchaseId);
+  if (index < 0 && !create) return null;
+  if (index < 0 && purchases.length >= MAX_PURCHASES) {
+    throw new Error(`A maximum of ${MAX_PURCHASES} purchase records is supported.`);
+  }
+  const existing = index >= 0 ? purchases[index] : {};
+  const albumId = String(payload.albumId || existing.albumId || "");
+  const albumIndex = vault.albums.findIndex(album => album.id === albumId);
+  if (albumIndex < 0) throw new Error("Choose an album from the collection.");
+  const purchase = normalisePurchase({
+    ...payload,
+    id: existing.id || purchaseId || recordId("purchase")
+  }, existing, vault.albums[albumIndex]);
+  if (index >= 0) purchases[index] = purchase;
+  else purchases.push(purchase);
+  vault.purchases = purchases;
+  if (payload.markOwned === true) {
+    vault.albums[albumIndex] = normaliseAlbum({
+      ...vault.albums[albumIndex],
+      status: "owned",
+      lastDashboardSave: new Date().toISOString()
+    });
+  }
+  writeVault(vault);
+  return { purchase, album: vault.albums[albumIndex] };
+}
+
+function deletePurchase(purchaseId) {
+  const vault = readVault();
+  const before = vault.purchases.length;
+  vault.purchases = vault.purchases.filter(purchase => purchase.id !== purchaseId);
+  if (vault.purchases.length === before) return false;
+  writeVault(vault);
+  return true;
 }
 
 function readJsonText(filePath) {
@@ -1122,6 +1210,80 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       send(res, 200, JSON.stringify({ ok: true, album: publicVault({ albums: [album] }).albums[0] }), types[".json"]);
+      return;
+    }
+
+    if (requestUrl.pathname === "/api/smart-collections" && req.method === "POST") {
+      try {
+        const payload = JSON.parse(await readBody(req));
+        const collection = saveSmartCollection("", payload, true);
+        send(res, 201, JSON.stringify({ ok: true, collection }), types[".json"]);
+      } catch (error) {
+        send(res, 400, JSON.stringify({ ok: false, message: error.message }), types[".json"]);
+      }
+      return;
+    }
+
+    const smartCollectionRoute = requestUrl.pathname.match(/^\/api\/smart-collections\/([^/]+)$/);
+    if (smartCollectionRoute && ["PATCH", "DELETE"].includes(req.method)) {
+      const collectionId = decodeURIComponent(smartCollectionRoute[1]);
+      if (req.method === "DELETE") {
+        const deleted = deleteSmartCollection(collectionId);
+        send(res, deleted ? 200 : 404, JSON.stringify({ ok: deleted, message: deleted ? "Smart collection deleted." : "Smart collection not found." }), types[".json"]);
+        return;
+      }
+      try {
+        const payload = JSON.parse(await readBody(req));
+        const collection = saveSmartCollection(collectionId, payload, false);
+        if (!collection) {
+          send(res, 404, JSON.stringify({ ok: false, message: "Smart collection not found." }), types[".json"]);
+          return;
+        }
+        send(res, 200, JSON.stringify({ ok: true, collection }), types[".json"]);
+      } catch (error) {
+        send(res, 400, JSON.stringify({ ok: false, message: error.message }), types[".json"]);
+      }
+      return;
+    }
+
+    if (requestUrl.pathname === "/api/purchases" && req.method === "POST") {
+      try {
+        const payload = JSON.parse(await readBody(req));
+        const saved = savePurchase("", payload, true);
+        send(res, 201, JSON.stringify({
+          ok: true,
+          purchase: saved.purchase,
+          album: publicVault({ albums: [saved.album] }).albums[0]
+        }), types[".json"]);
+      } catch (error) {
+        send(res, 400, JSON.stringify({ ok: false, message: error.message }), types[".json"]);
+      }
+      return;
+    }
+
+    const purchaseRoute = requestUrl.pathname.match(/^\/api\/purchases\/([^/]+)$/);
+    if (purchaseRoute && ["PATCH", "DELETE"].includes(req.method)) {
+      const purchaseId = decodeURIComponent(purchaseRoute[1]);
+      if (req.method === "DELETE") {
+        const deleted = deletePurchase(purchaseId);
+        send(res, deleted ? 200 : 404, JSON.stringify({ ok: deleted, message: deleted ? "Purchase deleted." : "Purchase not found." }), types[".json"]);
+        return;
+      }
+      try {
+        const payload = JSON.parse(await readBody(req));
+        const saved = savePurchase(purchaseId, payload, false);
+        if (!saved) {
+          send(res, 404, JSON.stringify({ ok: false, message: "Purchase not found." }), types[".json"]);
+          return;
+        }
+        send(res, 200, JSON.stringify({
+          ok: true,
+          purchase: saved.purchase,
+          album: publicVault({ albums: [saved.album] }).albums[0]
+        }), types[".json"]);
+      } catch (error) {
+        send(res, 400, JSON.stringify({ ok: false, message: error.message }), types[".json"]);
+      }
       return;
     }
 

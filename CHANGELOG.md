@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.6.0 - 2026-09-27
+
+### Added
+
+- Intelligence workspace for price history, smart collections, and purchase records.
+- Automatic bounded price observations with one unchanged seller price per local day and immediate capture of price changes.
+- Lowest-delivered-price timeline with current, low, high, movement, and recent seller observations in the device currency.
+- Saved smart collections using status, availability, priority, format, budget, maximum delivered price, and recency rules.
+- Purchase ledger with seller, item and delivery costs, currency, condition, order progress, notes, ownership updates, and live market comparison.
+- Validated local CRUD endpoints and model coverage for Intelligence data.
+
+### Privacy
+
+- Price observations, saved rules, and purchases remain inside ignored local vault data and pass through the existing public-data sanitisation boundary.
+
 ## 3.5.0 - 2026-09-27
 
 ### Added
