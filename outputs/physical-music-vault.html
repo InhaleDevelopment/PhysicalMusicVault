@@ -719,13 +719,14 @@
       <section id="searchPanel" class="view-panel" hidden>
         <div class="home-head">
           <div>
-            <h2>Your collection</h2>
-            <p class="subtle">Choose what to search, what you already own, and how urgently you want each release.</p>
+            <span class="section-kicker">Artist index</span>
+            <h2>Browse the shelves</h2>
+            <p class="subtle">Choose an initial, then open any album to manage its status, priority and price range.</p>
           </div>
           <button id="collectionScanButton" class="primary" type="button">Search wanted albums</button>
         </div>
         <div class="toolbar">
-          <input id="searchBox" type="search" placeholder="Search album, artist, year or genre" aria-label="Search collection">
+          <input id="searchBox" type="search" placeholder="Search every artist or album" aria-label="Search collection">
           <select id="statusFilter" aria-label="Status filter">
             <option value="all">All statuses</option>
             <option value="wanted">Wanted</option>
@@ -733,17 +734,10 @@
             <option value="owned">Owned</option>
             <option value="excluded">Not Interested</option>
           </select>
-          <select id="sortSelect" aria-label="Sort albums">
-            <option value="added">Newest added</option>
-            <option value="artist">Artist</option>
-            <option value="album">Album</option>
-            <option value="status">Status</option>
-            <option value="priority">Priority</option>
-          </select>
         </div>
-        <div class="collection-meta"><p id="collectionResultCount" class="subtle">0 albums</p><p class="subtle">Wanted albums enter the search queue. Owned and Not Interested albums stay out.</p></div>
+        <nav id="artistIndex" class="artist-index" aria-label="Browse artists by initial"></nav>
+        <div class="collection-meta"><p id="collectionResultCount">0 artists</p><p class="subtle">Wanted enters search. Owned and Not Interested stay out.</p></div>
         <section id="albumGrid" class="album-grid" aria-live="polite"></section>
-        <div id="loadMoreAlbumsWrap" class="load-more-wrap" hidden><button id="loadMoreAlbumsButton" type="button">Load more albums</button></div>
       </section>
 
       <section id="healthPanel" class="view-panel" hidden>
@@ -1010,16 +1004,21 @@
       { album: "Kind of Blue", artist: "Miles Davis", year: "1959", genre: "Jazz", status: "owned", format: "vinyl" },
       { album: "Carrie & Lowell", artist: "Sufjan Stevens", year: "2015", genre: "Folk", status: "wanted", format: "cd" }
     ];
+    const artistCategories = [
+      ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""),
+      ..."0123456789".split(""),
+      "#"
+    ];
+    const catalogueCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
 
     const state = {
       albums: loadVault(),
       query: "",
       status: "all",
       scanFormat: "cd",
-      sort: "added",
+      artistCategory: "A",
       view: "home",
       dailyPlanVisibleCount: 25,
-      libraryVisibleCount: 60,
       serverMode: false,
       vaultMeta: null,
       localeSaved: false,
@@ -1071,11 +1070,9 @@
       priorityFiveTableWrap: document.getElementById("mostWantedTableWrap"),
       collectionScanButton: document.getElementById("collectionScanButton"),
       collectionResultCount: document.getElementById("collectionResultCount"),
-      loadMoreAlbumsWrap: document.getElementById("loadMoreAlbumsWrap"),
-      loadMoreAlbumsButton: document.getElementById("loadMoreAlbumsButton"),
+      artistIndex: document.getElementById("artistIndex"),
       searchBox: document.getElementById("searchBox"),
       statusFilter: document.getElementById("statusFilter"),
-      sortSelect: document.getElementById("sortSelect"),
       albumGrid: document.getElementById("albumGrid"),
       syncStatus: document.getElementById("syncStatus"),
       noticeBoard: document.getElementById("noticeBoard"),
@@ -1387,21 +1384,60 @@
       return status === "owned" ? "Owned" : status === "excluded" ? "Not Interested" : "Wanted";
     }
 
+    function artistCategory(artist) {
+      const first = clean(artist)
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .charAt(0)
+        .toUpperCase();
+      if (/^[A-Z0-9]$/.test(first)) return first;
+      return "#";
+    }
+
+    function artistInventory() {
+      const inventory = new Map(artistCategories.map(category => [category, { albums: 0, artists: new Set() }]));
+      state.albums.forEach(album => {
+        const category = artistCategory(album.artist);
+        const entry = inventory.get(category);
+        entry.albums += 1;
+        entry.artists.add(clean(album.artist).toLocaleLowerCase());
+      });
+      return inventory;
+    }
+
+    function renderArtistIndex() {
+      const inventory = artistInventory();
+      const searching = Boolean(state.query.trim());
+      els.artistIndex.innerHTML = artistCategories.map(category => {
+        const entry = inventory.get(category);
+        const artistCount = entry.artists.size;
+        const label = category === "#" ? "Other" : category;
+        const selected = !searching && state.artistCategory === category;
+        return `<button type="button" data-artist-category="${escapeAttribute(category)}" aria-pressed="${selected}" aria-label="${escapeAttribute(`${label}: ${artistCount} artist${artistCount === 1 ? "" : "s"}`)}" title="${escapeAttribute(`${artistCount} artists · ${entry.albums} albums`)}" ${entry.albums ? "" : "disabled"}><span>${escapeHtml(label)}</span><small>${artistCount}</small></button>`;
+      }).join("");
+    }
+
     function getFilteredAlbums() {
-      const q = state.query.toLowerCase();
+      const q = state.query.trim().toLowerCase();
       return state.albums
         .filter(album => {
           const haystack = `${album.album} ${album.artist} ${album.genre} ${album.year}`.toLowerCase();
-          return (!q || haystack.includes(q)) &&
+          const matchesCategory = q || artistCategory(album.artist) === state.artistCategory;
+          return matchesCategory && (!q || haystack.includes(q)) &&
             (state.status === "all" || (state.status === "available" ? isAvailableCd(album) : albumStatus(album) === state.status));
         })
-        .sort((a, b) => {
-          if (state.sort === "album") return a.album.localeCompare(b.album);
-          if (state.sort === "status") return albumStatus(a).localeCompare(albumStatus(b)) || a.artist.localeCompare(b.artist);
-          if (state.sort === "priority") return albumPriority(b) - albumPriority(a) || a.artist.localeCompare(b.artist) || a.album.localeCompare(b.album);
-          if (state.sort === "added") return String(b.dateAdded).localeCompare(String(a.dateAdded));
-          return a.artist.localeCompare(b.artist) || a.album.localeCompare(b.album);
-        });
+        .sort((a, b) => catalogueCollator.compare(a.artist, b.artist) || catalogueCollator.compare(a.album, b.album));
+    }
+
+    function groupAlbumsByArtist(albums) {
+      const groups = new Map();
+      albums.forEach(album => {
+        const displayName = clean(album.artist) || "Unknown artist";
+        const key = displayName.normalize("NFKC").toLocaleLowerCase();
+        if (!groups.has(key)) groups.set(key, { artist: displayName, albums: [] });
+        groups.get(key).albums.push(album);
+      });
+      return [...groups.values()].sort((a, b) => catalogueCollator.compare(a.artist, b.artist));
     }
 
     function scanSearchQueries(format, artist = "Artist", album = "Album") {
@@ -1690,7 +1726,7 @@
       const settings = state.vaultMeta?.settings || {};
       const headings = {
         home: ["Local collection intelligence", "Available physical releases"],
-        search: ["Your digital library", "The collection shelf"],
+        search: ["Your indexed collection", "Artist shelves"],
         health: ["Local service status", "System health"],
         settings: ["Private on this device", "Vault settings"]
       };
@@ -1698,7 +1734,7 @@
       els.pageEyebrow.textContent = eyebrow;
       els.pageHeading.textContent = heading;
       if (state.view === "search") {
-        els.dashboardSubtitle.textContent = "Newest additions first · open a cover to manage it";
+        els.dashboardSubtitle.textContent = "A–Z, then 0–9 · every album one click away";
         return;
       }
       if (state.view === "health") {
@@ -1804,9 +1840,19 @@
         </article>`;
     }
 
+    function shelfRowsMarkup(albums, groupIndex) {
+      const columns = shelfColumnCount();
+      const rows = [];
+      for (let index = 0; index < albums.length; index += columns) rows.push(albums.slice(index, index + columns));
+      return rows.map((row, rowIndex) => `
+        <div class="shelf-row shelf-row-${(groupIndex + rowIndex) % 4}" style="--shelf-columns:${columns}" role="list">
+          <div class="shelf-covers">${row.map(shelfTile).join("")}</div>
+        </div>`).join("");
+    }
+
     function render() {
       const filteredAlbums = getFilteredAlbums();
-      const albums = filteredAlbums.slice(0, state.libraryVisibleCount);
+      const artistGroups = groupAlbumsByArtist(filteredAlbums);
       const counts = state.albums.reduce((acc, album) => {
         acc.total += 1;
         if (!album.missing || albumStatus(album) !== "wanted") {
@@ -1826,21 +1872,24 @@
       renderAvailableTable();
       renderHealth();
       renderSettings();
-      els.collectionResultCount.textContent = `${filteredAlbums.length.toLocaleString()} album${filteredAlbums.length === 1 ? "" : "s"}${filteredAlbums.length > albums.length ? ` · showing ${albums.length.toLocaleString()}` : ""}`;
-      els.loadMoreAlbumsWrap.hidden = albums.length >= filteredAlbums.length;
-      els.loadMoreAlbumsButton.textContent = `Load ${Math.min(60, Math.max(0, filteredAlbums.length - albums.length))} more albums`;
-      if (!albums.length) {
-        els.albumGrid.innerHTML = `<div class="empty"><div><h2>No albums in view</h2><p>Change the filters, import a library file, or add an album manually from Settings.</p></div></div>`;
+      renderArtistIndex();
+      const scopeLabel = state.query.trim() ? `Search: “${state.query.trim()}”` : state.artistCategory === "#" ? "Other" : state.artistCategory;
+      els.collectionResultCount.innerHTML = `<strong>${escapeHtml(scopeLabel)}</strong><span>${artistGroups.length.toLocaleString()} artist${artistGroups.length === 1 ? "" : "s"} · ${filteredAlbums.length.toLocaleString()} album${filteredAlbums.length === 1 ? "" : "s"}</span>`;
+      if (!filteredAlbums.length) {
+        els.albumGrid.innerHTML = `<div class="empty"><div><h2>No albums here</h2><p>Choose another initial or change the status filter.</p></div></div>`;
         return;
       }
 
-      const columns = shelfColumnCount();
-      const rows = [];
-      for (let index = 0; index < albums.length; index += columns) rows.push(albums.slice(index, index + columns));
-      els.albumGrid.innerHTML = rows.map((row, index) => `
-        <div class="shelf-row shelf-row-${index % 4}" style="--shelf-columns:${columns}" role="list">
-          <div class="shelf-covers">${row.map(shelfTile).join("")}</div>
-        </div>`).join("");
+      els.albumGrid.innerHTML = artistGroups.map((group, groupIndex) => {
+        const headingId = `artist-heading-${groupIndex}`;
+        return `<section class="artist-shelf-group" aria-labelledby="${headingId}">
+          <header class="artist-shelf-heading">
+            <h3 id="${headingId}">${escapeHtml(group.artist)}</h3>
+            <span>${group.albums.length} album${group.albums.length === 1 ? "" : "s"}</span>
+          </header>
+          <div class="artist-shelves">${shelfRowsMarkup(group.albums, groupIndex)}</div>
+        </section>`;
+      }).join("");
     }
 
     function renderNotices() {
@@ -2629,10 +2678,17 @@
       state.dailyPlanVisibleCount += 25;
       renderSettings();
     });
-    els.searchBox.addEventListener("input", event => { state.query = event.target.value; state.libraryVisibleCount = 60; render(); });
-    els.statusFilter.addEventListener("change", event => { state.status = event.target.value; state.libraryVisibleCount = 60; render(); });
-    els.sortSelect.addEventListener("change", event => { state.sort = event.target.value; state.libraryVisibleCount = 60; render(); });
-    els.loadMoreAlbumsButton.addEventListener("click", () => { state.libraryVisibleCount += 60; render(); });
+    els.searchBox.addEventListener("input", event => { state.query = event.target.value; render(); });
+    els.statusFilter.addEventListener("change", event => { state.status = event.target.value; render(); });
+    els.artistIndex.addEventListener("click", event => {
+      const button = event.target.closest("button[data-artist-category]");
+      if (!button || button.disabled) return;
+      state.artistCategory = button.dataset.artistCategory;
+      state.query = "";
+      els.searchBox.value = "";
+      render();
+      requestAnimationFrame(() => els.artistIndex.querySelector(`[data-artist-category="${CSS.escape(state.artistCategory)}"]`)?.focus({ preventScroll: true }));
+    });
     els.collectionScanButton.addEventListener("click", openScanLauncher);
     els.noticeBoard.addEventListener("click", event => {
       const target = event.target.closest("[data-view-target]");

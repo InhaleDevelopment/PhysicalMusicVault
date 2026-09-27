@@ -7,7 +7,7 @@ Version 3 is a dependency-light Node.js application with no account, cloud datab
 ## Product Flow
 
 1. Watch any configured `<Artist>/<Album>` music folder for changes and reconcile it every 10 minutes, or import a CSV/JSON catalogue.
-2. Browse a chronological shelf where every cover permanently displays `Album - Artist`, then open any title into a focused album workspace.
+2. Browse artists through an A–Z index followed by 0–9. Selecting an initial reveals every matching artist and all of their albums on grouped shelves; every cover permanently displays `Album - Artist`.
 3. Keep catalogue status separate from a 1-5 purchase priority and per-album delivered-price range.
 4. Select up to 500 Wanted albums per local calendar day, highest priority first.
 5. Choose CD, vinyl, or cassette when starting a search. CD uses `Artist - Album cd buy`; vinyl combines `Artist - Album vinyl buy` with `Artist - Album LP buy`; cassette combines `Artist - Album tape buy` with `Artist - Album cassette buy`. Country and region suffixes remain optional.

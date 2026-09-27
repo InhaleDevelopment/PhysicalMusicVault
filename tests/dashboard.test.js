@@ -67,6 +67,19 @@ test("collection is an interactive shelf with centred detail controls", () => {
   assert.doesNotMatch(html, /data-editor-group="format"/);
 });
 
+test("collection is indexed by artist initial and grouped by artist", () => {
+  assert.match(html, /id="artistIndex"/);
+  assert.match(html, /\.\.\."ABCDEFGHIJKLMNOPQRSTUVWXYZ"\.split\(""\)/);
+  assert.match(html, /\.\.\."0123456789"\.split\(""\)/);
+  assert.match(html, /function artistCategory\(artist\)/);
+  assert.match(html, /function groupAlbumsByArtist\(albums\)/);
+  assert.match(html, /class="artist-shelf-group"/);
+  assert.match(css, /\.artist-index/);
+  assert.match(css, /\.artist-shelf-heading/);
+  assert.doesNotMatch(html, /id="sortSelect"/);
+  assert.doesNotMatch(html, /id="loadMoreAlbumsButton"/);
+});
+
 test("physical format is selected when a search starts", () => {
   for (const format of ["cd", "vinyl", "cassette"]) assert.match(html, new RegExp(`data-scan-format="${format}"`));
   assert.match(html, /Artist - Album cd buy/);

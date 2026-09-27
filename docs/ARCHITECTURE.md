@@ -15,7 +15,7 @@ Physical Music Vault is intentionally local-first and dependency-light. A Node.j
 | `vault-platform.js` | Atomic persistence, settings allowlist, artwork safety, and API response sanitisation |
 | `vault-agent.js` | Background server supervision and local health reporting |
 | `vault-toggle.js` | One-command Windows on/off lifecycle |
-| `physical-music-vault.html` + `vault.css` + `assets/music-shelf.png` | Install-free browser application, responsive shelf interaction, and visual system |
+| `physical-music-vault.html` + `vault.css` + `assets/music-shelf.png` | Install-free browser application, normalized A–Z/0–9 artist index, responsive grouped shelves, and visual system |
 
 ## Data Flow
 

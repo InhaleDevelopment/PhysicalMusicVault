@@ -1,5 +1,19 @@
 # Changelog
 
+## 3.5.0 - 2026-09-27
+
+### Added
+
+- A normalized artist index ordered A–Z, then 0–9, with an Other category for remaining symbols.
+- Artist-grouped shelf sections that reveal every album for the selected initial.
+- Accent-insensitive categorization so names beginning with accented letters file under their base letter.
+
+### Changed
+
+- Reworked the visual skin into a tighter record-catalogue system with a persistent index, clearer hierarchy, and leaner Collection controls.
+- Collection search now spans the full library while initial browsing remains fast and focused.
+- Removed redundant Collection sorting and pagination; artist and album order is now naturally sorted within the selected category.
+
 ## 3.4.0 - 2026-09-24
 
 ### Changed
